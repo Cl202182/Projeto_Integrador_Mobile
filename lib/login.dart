@@ -22,36 +22,57 @@ class _MyLoginState extends State<MyLogin> {
 
       final uid = userCredential.user!.uid;
 
-      // Verifica se é ONG
-      final ongSnapshot =
+      final DocumentSnapshot ongDoc =
           await FirebaseFirestore.instance.collection('ongs').doc(uid).get();
 
-      if (ongSnapshot.exists) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Login como ONG')));
-        Navigator.pushNamed(context, '/hong');
+      final DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (ongDoc.exists && userDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Erro: Conta está duplicada em ONG e Usuário')),
+        );
         return;
       }
 
-      // Verifica se é Usuário
-      final userSnapshot = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(uid)
-          .get();
-
-      if (userSnapshot.exists) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Login como Usuário')));
-        Navigator.pushNamed(context, '/HomeUsuario');
+      if (ongDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login realizado como ONG.')),
+        );
+        Navigator.pushReplacementNamed(context, '/hong');
         return;
       }
 
-      // Nenhum tipo identificado
+      if (userDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login realizado como Usuário.')),
+        );
+        Navigator.pushReplacementNamed(context, '/postagem');
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tipo de conta não identificado.')));
+        const SnackBar(
+            content: Text('Conta autenticada, mas não encontrada no sistema.')),
+      );
     } on FirebaseAuthException catch (e) {
+      String errorMsg;
+
+      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+        errorMsg = 'Email ou senha incorretos.';
+      } else if (e.code == 'invalid-email') {
+        errorMsg = 'Formato de email inválido.';
+      } else {
+        errorMsg = 'Erro no login: ${e.message}';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro: ${e.message}")),
+        SnackBar(content: Text(errorMsg)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ocorreu um erro inesperado no login.')),
       );
     }
   }
@@ -120,9 +141,16 @@ class _MyLoginState extends State<MyLogin> {
                             controller: loginController,
                             label: "Email:",
                             icon: Icons.email,
-                            validator: (value) => value == null || value.isEmpty
-                                ? "Por favor, insira seu email"
-                                : null,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return "Por favor, insira seu email";
+                              } else if (!RegExp(
+                                      r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$")
+                                  .hasMatch(value)) {
+                                return "Email inválido";
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 30),
                           campoTexto(
