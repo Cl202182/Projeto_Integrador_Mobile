@@ -1,6 +1,6 @@
 name: flutter_application_projeto_integrador
 description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: 'none'
 
 version: 1.0.0+1
 
@@ -13,11 +13,10 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   http: any
-
-  # Firebase dependencies
   firebase_core: ^2.25.4
   firebase_auth: ^4.17.4
   cloud_firestore: ^4.8.3
+  file_picker: ^6.1.1  
 
 dev_dependencies:
   flutter_test:

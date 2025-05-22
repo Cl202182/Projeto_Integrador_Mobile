@@ -1,180 +1,268 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_projeto_integrador/PostagemDados.dart';
+import 'package:file_picker/file_picker.dart';
 
-class CriarPost extends StatefulWidget {
-  const CriarPost({super.key});
+class PostScreen extends StatefulWidget {
+  const PostScreen({super.key});
 
   @override
-  State<CriarPost> createState() => _CriarPostState();
+  State<PostScreen> createState() => _PostScreenState();
 }
 
-class _CriarPostState extends State<CriarPost> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+class _PostScreenState extends State<PostScreen> {
+  Uint8List? _image;
+  final TextEditingController _textController = TextEditingController();
 
-  TextEditingController tituloController = TextEditingController();
-  TextEditingController descricaoController = TextEditingController();
-
-  List<Dados> ListaDeDados = [];
-
-  void mostrar() {
-    for (var D in ListaDeDados) {
-      print("Titulo: ${D.titulo}");
-      print("******************************");
-      print("Descricao: ${D.descricao}");
+  Future<void> _pickImage() async {
+    final result = await FilePicker.platform
+        .pickFiles(type: FileType.image, withData: true);
+    if (result != null) {
+      setState(() {
+        _image = result.files.first.bytes;
+      });
     }
+  }
+
+  void _clear() {
+    setState(() {
+      _image = null;
+      _textController.clear();
+    });
+  }
+
+  void _submit() {
+    final text = _textController.text.trim();
+    if (_image == null || text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Selecione uma imagem e escreva algo.")),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Postagem enviada!"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.memory(_image!, width: 200),
+            const SizedBox(height: 10),
+            Text(text),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _clear();
+            },
+            child: const Text("Fechar"),
+          )
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final double larguraTela = MediaQuery.of(context).size.width;
+
     return Scaffold(
       body: Stack(
         children: [
-          //IMAGEM DE FUNDO
           Container(
-            height: double.infinity,
             width: double.infinity,
+            height: double.infinity,
             decoration: const BoxDecoration(
               image: DecorationImage(
-                  image: AssetImage("assets/images/fundo.jpg"),
-                  fit: BoxFit.cover),
-            ),
-          ),
-          //TELA BRANCA NA FRENTE DA IMAGEM
-          Center(
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.90,
-              width: MediaQuery.of(context).size.width * 0.95,
-              color: Colors.white,
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                image: AssetImage("assets/images/fundo.jpg"),
+                fit: BoxFit.cover,
               ),
             ),
           ),
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.90,
-            width: MediaQuery.of(context).size.width * 0.98,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(
-                        height: 200,
+          Center(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: 60),
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    child: SizedBox(
+                      width: larguraTela * 0.88,
+                      height: 150,
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        fit: BoxFit.cover,
                       ),
-                      const Text(
-                        'Nova postagem',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
+                    ),
+                  ),
+                  Container(
+                    width: larguraTela * 0.88,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 30, horizontal: 20),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
                       ),
-                      const SizedBox(height: 30),
-                      TextFormField(
-                        controller: tituloController,
-                        decoration: InputDecoration(
-                          labelText: 'Título',
-                          icon: const Icon(Icons.title, color: Colors.blue),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'NOVA POSTAGEM',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        validator: (value) {
-                          if (value!.isEmpty) {
-                            return 'Por favor, insira um título';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: descricaoController,
-                        decoration: InputDecoration(
-                          labelText: 'Descrição',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
-                          icon: const Icon(Icons.info, color: Colors.blue),
-                        ),
-                        maxLines: 6,
-                        validator: (value) {
-                          if (value!.isEmpty) {
-                            return 'Por favor, insira uma descrição';
-                          } else {
-                            if (value.length < 30) {
-                              return 'A descrição deve ter pelo menos 30 caracteres';
-                            }
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Center(
-                        child: Column(
-                          children: [
-                            Image.asset(
-                              'assets/images/dog.png',
-                              width: 200,
-                            ),
-                            const SizedBox(height: 10),
-                            ElevatedButton(
-                              onPressed: () {
-                                if (_formKey.currentState!.validate()) {
-                                  Dados D = Dados(
-                                    tituloController.text,
-                                    descricaoController.text,
-                                  );
-                                  ListaDeDados.add(D);
-                                  mostrar();
-                                  setState(() {});
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 12),
-                                child: Text(
-                                  'Enviar',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                        const SizedBox(height: 30),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 400),
+                          transitionBuilder:
+                              (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                                opacity: animation, child: child);
+                          },
+                          child: _image != null
+                              ? Stack(
+                                  key: const ValueKey("image"),
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: AspectRatio(
+                                        aspectRatio: 4 / 3,
+                                        child: Image.memory(
+                                          _image!,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: GestureDetector(
+                                        onTap: () =>
+                                            setState(() => _image = null),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.black.withOpacity(0.6),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : GestureDetector(
+                                  key: const ValueKey("button"),
+                                  onTap: _pickImage,
+                                  child: Container(
+                                    height: 120,
+                                    width: 120,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          const Color.fromARGB(255, 1, 37, 54),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.2),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.add_a_photo_rounded,
+                                        size: 40,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
+                        ),
+                        const SizedBox(height: 30),
+                        TextField(
+                          controller: _textController,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            hintText: "Escreva sua mensagem...",
+                            hintStyle: const TextStyle(color: Colors.grey),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            filled: true,
+                            fillColor: const Color.fromARGB(255, 240, 240, 240),
+                            contentPadding: const EdgeInsets.all(16),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _submit,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      const Color.fromARGB(255, 1, 37, 54),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text("Publicar",
+                                    style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _clear,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      const Color.fromARGB(255, 1, 37, 54),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text("Cancelar",
+                                    style: TextStyle(color: Colors.white)),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
           ),
-          //BANNER DO APP
-          Center(
-            child: Column(
-              children: [
-                const SizedBox(height: 30),
-                FractionallySizedBox(
-                  widthFactor: 0.95,
-                  child: SizedBox(
-                    height: 150,
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      fit: BoxFit.fitWidth,
-                    ),
-                  ),
-                ),
-              ],
+          Positioned(
+            top: 30,
+            left: 0,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
             ),
           ),
         ],

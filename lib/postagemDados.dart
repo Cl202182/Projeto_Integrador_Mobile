@@ -1,4 +1,4 @@
-class Dados{
+/*class Dados{
   String titulo="";
   String descricao="";
 
@@ -13,4 +13,4 @@ class Dados{
 
  set setDescricao(String descricao) => this.descricao = descricao;
 
-}
+}*/

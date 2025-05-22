@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// Suas telas
 import 'package:flutter_application_projeto_integrador/cadastroOng.dart';
 import 'package:flutter_application_projeto_integrador/cadastroUsuario.dart';
 import 'package:flutter_application_projeto_integrador/home.dart';
@@ -11,6 +10,7 @@ import 'package:flutter_application_projeto_integrador/infoOng.dart';
 import 'package:flutter_application_projeto_integrador/login.dart';
 import 'package:flutter_application_projeto_integrador/postagem.dart';
 import 'package:flutter_application_projeto_integrador/sobrenos.dart';
+import 'package:flutter_application_projeto_integrador/telaChat.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,11 +55,12 @@ class MyApp extends StatelessWidget {
         '/': (context) => MyTela(),
         '/registro': (context) => InfoOng(),
         '/login': (context) => MyLogin(),
-        '/postagem': (context) => CriarPost(),
+        '/postagem': (context) => PostScreen(),
         '/SN': (context) => MySN(),
         '/CadUsuario': (context) => cliente(),
         '/CadOng': (context) => ong(),
         '/hong': (context) => HomeONG(),
+        '/chat': (context) => TelaChat(),
       },
     );
   }
