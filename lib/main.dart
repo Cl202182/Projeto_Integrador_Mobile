@@ -11,6 +11,7 @@ import 'package:flutter_application_projeto_integrador/login.dart';
 import 'package:flutter_application_projeto_integrador/postagem.dart';
 import 'package:flutter_application_projeto_integrador/sobrenos.dart';
 import 'package:flutter_application_projeto_integrador/telaChat.dart';
+import 'package:flutter_application_projeto_integrador/telaContatos.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +61,7 @@ class MyApp extends StatelessWidget {
         '/CadUsuario': (context) => cliente(),
         '/CadOng': (context) => ong(),
         '/hong': (context) => HomeONG(),
+        '/contato': (context) => Contato(),
         '/chat': (context) => TelaChat(),
       },
     );

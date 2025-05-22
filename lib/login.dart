@@ -48,7 +48,7 @@ class _MyLoginState extends State<MyLogin> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login realizado como Usuário.')),
         );
-        Navigator.pushReplacementNamed(context, '/postagem');
+        Navigator.pushReplacementNamed(context, '/hong');
         return;
       }
 

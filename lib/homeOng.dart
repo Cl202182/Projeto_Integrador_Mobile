@@ -31,7 +31,7 @@ class HomeONG extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/chat');
+                Navigator.pushNamed(context, '/contato');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
