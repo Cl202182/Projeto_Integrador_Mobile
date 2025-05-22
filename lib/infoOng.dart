@@ -100,11 +100,11 @@ class _InfoOngState extends State<InfoOng> {
                       ),
                       child: ListTile(
                         leading: CircleAvatar(
+                          backgroundColor: Color.fromARGB(255, 1, 37, 54),
                           child: Text(
                             listaOng[index].nome[0].toUpperCase(),
                             style: TextStyle(color: Colors.white),
                           ),
-                          backgroundColor: Color.fromARGB(255, 1, 37, 54),
                         ),
                         title: Text(listaOng[index].nome.toString()),
                         subtitle: Text(listaOng[index].email.toString()),

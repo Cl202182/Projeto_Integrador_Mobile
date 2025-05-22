@@ -1,15 +1,13 @@
-class Cliente{
+class Cliente {
+  String _nome = "";
+  String _email = "";
 
-String _nome="";
-String _email="";
+  Cliente(this._email, this._nome);
+  String get nome => _nome;
 
+  set nome(String value) => _nome = value;
 
-Cliente(this._email , this._nome);
- String get nome => this._nome;
+  String get email => _email;
 
- set nome(String value) => this._nome = value;
-
- String get email => this._email;
-
- set email(String value) => this._email = value;
+  set email(String value) => _email = value;
 }

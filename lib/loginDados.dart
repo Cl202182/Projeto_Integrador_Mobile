@@ -1,16 +1,14 @@
-class DadosL{
-  String login="";
-  String senha="";
+class DadosL {
+  String login = "";
+  String senha = "";
 
-DadosL(this.login,this.senha);
+  DadosL(this.login, this.senha);
 
- String get getNome => this.login;
+  String get getNome => login;
 
- set setNome(String nome) => this.login = login;
+  set setNome(String nome) => login = login;
 
-  get getSenha => this.senha;
+  get getSenha => senha;
 
- set setSenha( senha) => this.senha = senha;
-
-  
+  set setSenha(senha) => this.senha = senha;
 }
