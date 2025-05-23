@@ -20,7 +20,7 @@ class _ContatoState extends State<Contato> {
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').snapshots(),
+        stream: FirebaseFirestore.instance.collection('ongs').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const Center(child: Text('Erro ao carregar usuários.'));
@@ -30,17 +30,17 @@ class _ContatoState extends State<Contato> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final users = snapshot.data!.docs;
+          final ongs = snapshot.data!.docs;
 
-          if (users.isEmpty) {
+          if (ongs.isEmpty) {
             return const Center(child: Text('Nenhum usuário encontrado.'));
           }
 
           return ListView.builder(
-            itemCount: users.length,
+            itemCount: ongs.length,
             itemBuilder: (context, index) {
-              final userData = users[index].data() as Map<String, dynamic>;
-              final userId = users[index].id;
+              final userData = ongs[index].data() as Map<String, dynamic>;
+              final userId = ongs[index].id;
               final userName = userData['nome'] ?? 'Usuário sem nome';
 
               return Padding(
