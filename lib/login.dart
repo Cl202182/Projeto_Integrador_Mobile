@@ -14,6 +14,7 @@ class _MyLoginState extends State<MyLogin> {
 
   TextEditingController loginController = TextEditingController();
   TextEditingController senhaController = TextEditingController();
+  bool _obscureSenha = true;
 
   Future<void> fazerLogin(String email, String senha) async {
     try {
@@ -75,6 +76,61 @@ class _MyLoginState extends State<MyLogin> {
         const SnackBar(content: Text('Ocorreu um erro inesperado no login.')),
       );
     }
+  }
+
+  void _mostrarDialogoRedefinirSenha() {
+    final TextEditingController emailResetController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Redefinir senha"),
+          content: TextField(
+            controller: emailResetController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: "Digite seu email",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Cancelar"),
+            ),
+            TextButton(
+              onPressed: () async {
+                final email = emailResetController.text.trim();
+                if (email.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Digite um email válido.")),
+                  );
+                  return;
+                }
+                try {
+                  await FirebaseAuth.instance
+                      .sendPasswordResetEmail(email: email);
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            "Email de redefinição enviado. Verifique sua caixa de entrada.")),
+                  );
+                } on FirebaseAuthException catch (e) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Erro: ${e.message}"),
+                    ),
+                  );
+                }
+              },
+              child: const Text("Enviar"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -141,6 +197,7 @@ class _MyLoginState extends State<MyLogin> {
                             controller: loginController,
                             label: "Email:",
                             icon: Icons.email,
+                            tipoTeclado: TextInputType.emailAddress,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return "Por favor, insira seu email";
@@ -155,7 +212,7 @@ class _MyLoginState extends State<MyLogin> {
                           const SizedBox(height: 30),
                           campoTexto(
                             controller: senhaController,
-                            label: "Senha",
+                            label: "Senha:",
                             icon: Icons.lock,
                             obscure: true,
                             validator: (value) {
@@ -167,7 +224,21 @@ class _MyLoginState extends State<MyLogin> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _mostrarDialogoRedefinirSenha,
+                              child: const Text(
+                                "Esqueci minha senha",
+                                style: TextStyle(
+                                  color: Color.fromARGB(255, 1, 37, 54),
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           Row(
                             children: [
                               Expanded(
@@ -266,14 +337,29 @@ class _MyLoginState extends State<MyLogin> {
     bool obscure = false,
     required String? Function(String?) validator,
   }) {
+    final bool isSenha = label.toLowerCase().contains("senha");
+
     return TextFormField(
       controller: controller,
       keyboardType: tipoTeclado,
-      obscureText: obscure,
+      obscureText: isSenha ? _obscureSenha : obscure,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white),
         prefixIcon: Icon(icon),
+        suffixIcon: isSenha
+            ? IconButton(
+                icon: Icon(
+                  _obscureSenha ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscureSenha = !_obscureSenha;
+                  });
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
         ),
