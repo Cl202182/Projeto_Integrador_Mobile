@@ -49,7 +49,7 @@ class _MyLoginState extends State<MyLogin> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login realizado como Usuário.')),
         );
-        Navigator.pushReplacementNamed(context, '/hong');
+        Navigator.pushReplacementNamed(context, '/huser');
         return;
       }
 

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_application_projeto_integrador/TelaAtendimentos.dart';
 
 import 'package:flutter_application_projeto_integrador/cadastroOng.dart';
 import 'package:flutter_application_projeto_integrador/cadastroUsuario.dart';
 import 'package:flutter_application_projeto_integrador/home.dart';
 import 'package:flutter_application_projeto_integrador/homeOng.dart';
+import 'package:flutter_application_projeto_integrador/homeUser.dart';
 import 'package:flutter_application_projeto_integrador/infoOng.dart';
 import 'package:flutter_application_projeto_integrador/login.dart';
 import 'package:flutter_application_projeto_integrador/postagem.dart';
@@ -61,8 +63,10 @@ class MyApp extends StatelessWidget {
         '/CadUsuario': (context) => cliente(),
         '/CadOng': (context) => ong(),
         '/hong': (context) => HomeONG(),
-        '/contato': (context) => Contato(),
+        '/contatoOng': (context) => Atendimento(),
+        '/contatoUser': (context) => Contato(),
         '/chat': (context) => TelaChat(),
+        '/huser': (context) => HomeUser(),
       },
     );
   }
