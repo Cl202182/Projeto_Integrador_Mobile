@@ -8,27 +8,21 @@ class HomeUser extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bem-vindo Usuário'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat),
+            tooltip: 'Ir para Chat',
+            onPressed: () {
+              Navigator.pushNamed(context, '/contatoUser');
+            },
+          ),
+        ],
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Hello, Usuário!',
-              style: TextStyle(fontSize: 24),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/contatoUser');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-              ),
-              child: const Text('Ir para Chat'),
-            ),
-          ],
+          children: [],
         ),
       ),
     );

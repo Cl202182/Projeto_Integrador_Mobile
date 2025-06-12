@@ -8,37 +8,28 @@ class HomeONG extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bem-vindo ONG'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.post_add),
+            tooltip: 'Ir para Postagem',
+            onPressed: () {
+              Navigator.pushNamed(context, '/postagem');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.chat),
+            tooltip: 'Ir para Chat',
+            onPressed: () {
+              Navigator.pushNamed(context, '/contatoOng');
+            },
+          ),
+        ],
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Hello, ONG!',
-              style: TextStyle(fontSize: 24),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/postagem');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-              ),
-              child: const Text('Ir para Postagem'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/contatoOng');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-              ),
-              child: const Text('Ir para Chat'),
-            ),
-          ],
+          children: [],
         ),
       ),
     );
