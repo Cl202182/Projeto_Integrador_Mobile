@@ -187,7 +187,7 @@ class _ContatoState extends State<Contato> {
                       ],
                     ),
                   ),
-                  // Botão de pesquisa estilizado (removido o segundo botão)
+                  // Botão de pesquisa estilizado
                   GestureDetector(
                     onTap: _openSearchPage,
                     child: Container(
@@ -374,6 +374,8 @@ class _ContatoState extends State<Contato> {
                         final ongDescription = ongData['descricao'] ??
                             ongData['description'] ??
                             '';
+                        final areasAtuacao =
+                            List<String>.from(ongData['areasAtuacao'] ?? []);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -452,7 +454,56 @@ class _ContatoState extends State<Contato> {
                                                   255, 1, 37, 54),
                                             ),
                                           ),
-                                          if (ongDescription.isNotEmpty) ...[
+                                          if (areasAtuacao.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Wrap(
+                                              spacing: 4,
+                                              runSpacing: 2,
+                                              children: areasAtuacao
+                                                  .take(2)
+                                                  .map((area) => Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: const Color
+                                                                  .fromARGB(255,
+                                                                  1, 37, 54)
+                                                              .withOpacity(0.1),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        child: Text(
+                                                          area,
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 10,
+                                                            color:
+                                                                Color.fromARGB(
+                                                                    255,
+                                                                    1,
+                                                                    37,
+                                                                    54),
+                                                          ),
+                                                        ),
+                                                      ))
+                                                  .toList(),
+                                            ),
+                                            if (areasAtuacao.length > 2)
+                                              Text(
+                                                '+${areasAtuacao.length - 2} outras',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                          ] else if (ongDescription
+                                              .isNotEmpty) ...[
                                             const SizedBox(height: 4),
                                             Text(
                                               ongDescription.length > 50
@@ -511,7 +562,7 @@ class _ContatoState extends State<Contato> {
   }
 }
 
-// Nova página de pesquisa - estilo Instagram
+// Página de pesquisa com filtros avançados
 class SearchOngsPage extends StatefulWidget {
   final String currentUserId;
   final String? currentUserName;
@@ -529,6 +580,47 @@ class SearchOngsPage extends StatefulWidget {
 class _SearchOngsPageState extends State<SearchOngsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  List<String> _selectedFilters = [];
+  bool _showFilters = false;
+
+  // Áreas de atuação disponíveis (mesmas do PerfilOng)
+  final List<String> areasDisponiveis = [
+    'Educação',
+    'Saúde',
+    'Meio Ambiente',
+    'Assistência Social',
+    'Cultura',
+    'Esporte',
+    'Direitos Humanos',
+    'Animais',
+    'Idosos',
+    'Crianças e Adolescentes',
+  ];
+
+  void _toggleFilter(String filter) {
+    setState(() {
+      if (_selectedFilters.contains(filter)) {
+        _selectedFilters.remove(filter);
+      } else {
+        _selectedFilters.add(filter);
+      }
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedFilters.clear();
+    });
+  }
+
+  bool _ongMatchesFilters(Map<String, dynamic> ongData) {
+    if (_selectedFilters.isEmpty) return true;
+
+    final ongAreas = List<String>.from(ongData['areasAtuacao'] ?? []);
+
+    // Verifica se a ONG tem pelo menos uma área selecionada
+    return _selectedFilters.any((filter) => ongAreas.contains(filter));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -594,204 +686,437 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
             ),
           ),
         ),
-      ),
-      body: _searchQuery.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.search,
-                    size: 80,
-                    color: Colors.grey[300],
+        actions: [
+          // Botão de filtros
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.tune, color: Colors.white),
+                if (_selectedFilters.isNotEmpty)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 12,
+                        minHeight: 12,
+                      ),
+                      child: Text(
+                        '${_selectedFilters.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Digite para pesquisar ONGs',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[500],
+              ],
+            ),
+            onPressed: () {
+              setState(() {
+                _showFilters = !_showFilters;
+              });
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Painel de filtros
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: _showFilters ? 120 : 0,
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filtrar por área de atuação:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (_selectedFilters.isNotEmpty)
+                          TextButton(
+                            onPressed: _clearFilters,
+                            child: const Text(
+                              'Limpar',
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 1, 37, 54),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: areasDisponiveis.map((area) {
+                          bool isSelected = _selectedFilters.contains(area);
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(
+                                area,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color.fromARGB(255, 1, 37, 54),
+                                ),
+                              ),
+                              selected: isSelected,
+                              onSelected: (selected) => _toggleFilter(area),
+                              backgroundColor: Colors.grey[200],
+                              selectedColor:
+                                  const Color.fromARGB(255, 1, 37, 54),
+                              checkmarkColor: Colors.white,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ],
               ),
-            )
-          : StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('ongs').snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Erro ao carregar ONGs'),
-                  );
-                }
+            ),
+          ),
 
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: Color.fromARGB(255, 1, 37, 54),
-                    ),
-                  );
-                }
-
-                // Filtra ONGs
-                final ongs = snapshot.data!.docs.where((doc) {
-                  final ongData = doc.data() as Map<String, dynamic>;
-                  final ongName = ongData['nome'] ?? ongData['name'] ?? '';
-                  final ongId = doc.id;
-
-                  // Exclui o próprio usuário
-                  if (ongId == widget.currentUserId) return false;
-
-                  // Aplica filtro de pesquisa
-                  return ongName.toLowerCase().contains(_searchQuery);
-                }).toList();
-
-                if (ongs.isEmpty) {
-                  return Center(
+          // Lista de resultados
+          Expanded(
+            child: _searchQuery.isEmpty && _selectedFilters.isEmpty
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.search_off,
-                          size: 60,
-                          color: Colors.grey[400],
+                          Icons.search,
+                          size: 80,
+                          color: Colors.grey[300],
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Nenhuma ONG encontrada',
+                          'Digite para pesquisar ONGs',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Use os filtros para buscar por área de atuação',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[400],
                           ),
                         ),
                       ],
                     ),
-                  );
-                }
+                  )
+                : StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('ongs')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return const Center(
+                          child: Text('Erro ao carregar ONGs'),
+                        );
+                      }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: ongs.length,
-                  itemBuilder: (context, index) {
-                    final ongData = ongs[index].data() as Map<String, dynamic>;
-                    final ongId = ongs[index].id;
-                    final ongName =
-                        ongData['nome'] ?? ongData['name'] ?? 'ONG sem nome';
-                    final ongEmail = ongData['email'] ?? '';
-                    final ongDescription =
-                        ongData['descricao'] ?? ongData['description'] ?? '';
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Color.fromARGB(255, 1, 37, 54),
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            String chatId =
-                                _generateChatId(widget.currentUserId, ongId);
+                        );
+                      }
 
-                            Navigator.pop(context); // Fecha a tela de pesquisa
-                            Navigator.pushNamed(
-                              context,
-                              '/chat',
-                              arguments: {
-                                'chatId': chatId,
-                                'userName': ongName,
-                                'userId': ongId,
-                                'currentUserId': widget.currentUserId,
-                                'currentUserName': widget.currentUserName,
-                              },
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: const Color.fromARGB(255, 1, 37, 54),
-                                    borderRadius: BorderRadius.circular(25),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      ongName.isNotEmpty
-                                          ? ongName[0].toUpperCase()
-                                          : 'O',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                      // Filtra ONGs
+                      final ongs = snapshot.data!.docs.where((doc) {
+                        final ongData = doc.data() as Map<String, dynamic>;
+                        final ongName =
+                            ongData['nome'] ?? ongData['name'] ?? '';
+                        final ongId = doc.id;
+
+                        // Exclui o próprio usuário
+                        if (ongId == widget.currentUserId) return false;
+
+                        // Aplica filtro de pesquisa por nome
+                        bool matchesSearch = _searchQuery.isEmpty ||
+                            ongName.toLowerCase().contains(_searchQuery);
+
+                        // Aplica filtros de áreas de atuação
+                        bool matchesFilters = _ongMatchesFilters(ongData);
+
+                        return matchesSearch && matchesFilters;
+                      }).toList();
+
+                      if (ongs.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: 60,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Nenhuma ONG encontrada',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (_selectedFilters.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tente ajustar os filtros',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
                                   ),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
+                              ],
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: ongs.length,
+                        itemBuilder: (context, index) {
+                          final ongData =
+                              ongs[index].data() as Map<String, dynamic>;
+                          final ongId = ongs[index].id;
+                          final ongName = ongData['nome'] ??
+                              ongData['name'] ??
+                              'ONG sem nome';
+                          final ongEmail = ongData['email'] ?? '';
+                          final ongDescription = ongData['descricao'] ??
+                              ongData['description'] ??
+                              '';
+                          final areasAtuacao =
+                              List<String>.from(ongData['areasAtuacao'] ?? []);
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  String chatId = _generateChatId(
+                                      widget.currentUserId, ongId);
+
+                                  Navigator.pop(
+                                      context); // Fecha a tela de pesquisa
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/chat',
+                                    arguments: {
+                                      'chatId': chatId,
+                                      'userName': ongName,
+                                      'userId': ongId,
+                                      'currentUserId': widget.currentUserId,
+                                      'currentUserName': widget.currentUserName,
+                                    },
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        ongName,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color.fromARGB(255, 1, 37, 54),
-                                        ),
-                                      ),
-                                      if (ongDescription.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          ongDescription.length > 50
-                                              ? '${ongDescription.substring(0, 50)}...'
-                                              : ongDescription,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 50,
+                                            height: 50,
+                                            decoration: BoxDecoration(
+                                              color: const Color.fromARGB(
+                                                  255, 1, 37, 54),
+                                              borderRadius:
+                                                  BorderRadius.circular(25),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                ongName.isNotEmpty
+                                                    ? ongName[0].toUpperCase()
+                                                    : 'O',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ] else if (ongEmail.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          ongEmail,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey[600],
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  ongName,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color.fromARGB(
+                                                        255, 1, 37, 54),
+                                                  ),
+                                                ),
+                                                if (ongDescription
+                                                    .isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    ongDescription.length > 80
+                                                        ? '${ongDescription.substring(0, 80)}...'
+                                                        : ongDescription,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ] else if (ongEmail
+                                                    .isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    ongEmail,
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.arrow_forward_ios,
+                                            color: Colors.grey[400],
+                                            size: 16,
+                                          ),
+                                        ],
+                                      ),
+                                      // Áreas de atuação
+                                      if (areasAtuacao.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[50],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: areasAtuacao.map((area) {
+                                              bool isHighlighted =
+                                                  _selectedFilters
+                                                      .contains(area);
+                                              return Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: isHighlighted
+                                                      ? const Color.fromARGB(
+                                                              255, 1, 37, 54)
+                                                          .withOpacity(0.2)
+                                                      : Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: isHighlighted
+                                                        ? const Color.fromARGB(
+                                                            255, 1, 37, 54)
+                                                        : Colors.grey[300]!,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  area,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isHighlighted
+                                                        ? const Color.fromARGB(
+                                                            255, 1, 37, 54)
+                                                        : Colors.grey[700],
+                                                    fontWeight: isHighlighted
+                                                        ? FontWeight.w600
+                                                        : FontWeight.normal,
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
                                           ),
                                         ),
                                       ],
                                     ],
                                   ),
                                 ),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.grey[400],
-                                  size: 16,
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

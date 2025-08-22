@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 class TelaChat extends StatefulWidget {
   const TelaChat({super.key});
@@ -17,6 +19,7 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   late DatabaseReference _messagesRef;
   late String chatId;
   late String userName;
+  late String userId;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -39,6 +42,7 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
     final args = ModalRoute.of(context)!.settings.arguments as Map;
     chatId = args['chatId'];
     userName = args['userName'];
+    userId = args['userId'];
     _messagesRef =
         FirebaseDatabase.instance.ref().child('chats/$chatId/messages');
   }
@@ -76,6 +80,18 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   String _formatTimestamp(int timestamp) {
     return DateFormat('HH:mm')
         .format(DateTime.fromMillisecondsSinceEpoch(timestamp));
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PerfilVisualizacao(
+          ongId: userId,
+          ongName: userName,
+        ),
+      ),
+    );
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
@@ -187,49 +203,53 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
         elevation: 0,
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
         foregroundColor: Colors.white,
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              child: Text(
-                userName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+        title: GestureDetector(
+          onTap: _openProfile,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Text(
+                  userName[0].toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    userName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'Online',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white70,
+                    const Text(
+                      'Toque para ver o perfil',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {},
+            icon: const Icon(Icons.info_outline, color: Colors.white),
+            onPressed: _openProfile,
+            tooltip: 'Ver perfil',
           ),
         ],
       ),
@@ -403,6 +423,627 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Tela de visualização do perfil da ONG
+class PerfilVisualizacao extends StatefulWidget {
+  final String ongId;
+  final String ongName;
+
+  const PerfilVisualizacao({
+    super.key,
+    required this.ongId,
+    required this.ongName,
+  });
+
+  @override
+  State<PerfilVisualizacao> createState() => _PerfilVisualizacaoState();
+}
+
+class _PerfilVisualizacaoState extends State<PerfilVisualizacao> {
+  Map<String, dynamic>? ongData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDadosOng();
+  }
+
+  Future<void> _carregarDadosOng() async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('ongs')
+          .doc(widget.ongId)
+          .get();
+
+      if (doc.exists) {
+        setState(() {
+          ongData = doc.data() as Map<String, dynamic>;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar dados: $e')),
+      );
+    }
+  }
+
+  Future<void> _copiarParaClipboard(String texto, String tipo) async {
+    await Clipboard.setData(ClipboardData(text: texto));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$tipo copiado para a área de transferência'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+      ),
+    );
+  }
+
+  void _mostrarDetalhesContato(String titulo, String conteudo, String tipo) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(titulo),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(conteudo),
+              const SizedBox(height: 16),
+              Text(
+                'Toque em "Copiar" para copiar para a área de transferência.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _copiarParaClipboard(conteudo, tipo);
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+              ),
+              child: const Text(
+                'Copiar',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoCard(String title, String? content, IconData icon,
+      {VoidCallback? onTap, Color? iconColor}) {
+    if (content == null || content.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (iconColor ?? const Color.fromARGB(255, 1, 37, 54))
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor ?? const Color.fromARGB(255, 1, 37, 54),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromARGB(255, 1, 37, 54),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        content,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.grey[400],
+                    size: 16,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorarioFuncionamento() {
+    if (ongData?['horarioFuncionamento'] == null)
+      return const SizedBox.shrink();
+
+    Map<String, String> horarios =
+        Map<String, String>.from(ongData!['horarioFuncionamento']);
+
+    // Remove horários vazios
+    horarios.removeWhere((key, value) => value.isEmpty);
+
+    if (horarios.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        const Color.fromARGB(255, 1, 37, 54).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.schedule,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Horário de Funcionamento',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...horarios.entries
+                .map((entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              '${_capitalize(entry.key)}:',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            entry.value,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ))
+                .toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAreasAtuacao() {
+    if (ongData?['areasAtuacao'] == null) return const SizedBox.shrink();
+
+    List<String> areas = List<String>.from(ongData!['areasAtuacao']);
+    if (areas.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        const Color.fromARGB(255, 1, 37, 54).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.category,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Áreas de Atuação',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: areas
+                  .map((area) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 1, 37, 54)
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color.fromARGB(255, 1, 37, 54)
+                                .withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          area,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color.fromARGB(255, 1, 37, 54),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text(
+          widget.ongName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 1, 37, 54),
+              ),
+            )
+          : ongData == null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 60,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Perfil não encontrado',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Header com foto e nome
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color.fromARGB(255, 1, 37, 54),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ongData?['imagemUrl'] != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(40),
+                                      child: Image.network(
+                                        ongData!['imagemUrl'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return Center(
+                                            child: Text(
+                                              widget.ongName[0].toUpperCase(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        widget.ongName[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.ongName,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromARGB(255, 1, 37, 54),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (ongData?['email'] != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                ongData!['email'],
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Informações
+                      _buildInfoCard(
+                        'Descrição',
+                        ongData?['descricao'],
+                        Icons.description,
+                      ),
+
+                      _buildInfoCard(
+                        'Telefone',
+                        ongData?['telefone'],
+                        Icons.phone,
+                        onTap: ongData?['telefone'] != null
+                            ? () => _mostrarDetalhesContato(
+                                'Telefone', ongData!['telefone'], 'Telefone')
+                            : null,
+                        iconColor: Colors.green[600],
+                      ),
+
+                      _buildInfoCard(
+                        'WhatsApp',
+                        ongData?['whatsapp'],
+                        Icons.chat,
+                        onTap: ongData?['whatsapp'] != null
+                            ? () => _mostrarDetalhesContato(
+                                'WhatsApp', ongData!['whatsapp'], 'WhatsApp')
+                            : null,
+                        iconColor: Colors.green[700],
+                      ),
+
+                      _buildInfoCard(
+                        'Endereço',
+                        ongData?['endereco'],
+                        Icons.location_on,
+                        onTap: ongData?['endereco'] != null
+                            ? () => _mostrarDetalhesContato(
+                                'Endereço', ongData!['endereco'], 'Endereço')
+                            : null,
+                        iconColor: Colors.red[600],
+                      ),
+
+                      _buildInfoCard(
+                        'Site',
+                        ongData?['site'],
+                        Icons.web,
+                        onTap: ongData?['site'] != null
+                            ? () => _mostrarDetalhesContato(
+                                'Site', ongData!['site'], 'Site')
+                            : null,
+                        iconColor: Colors.blue[600],
+                      ),
+
+                      _buildInfoCard(
+                        'Instagram',
+                        ongData?['instagram'] != null
+                            ? '@${ongData!['instagram'].replaceAll('@', '')}'
+                            : null,
+                        Icons.camera_alt,
+                        onTap: ongData?['instagram'] != null
+                            ? () => _mostrarDetalhesContato(
+                                'Instagram',
+                                '@${ongData!['instagram'].replaceAll('@', '')}',
+                                'Instagram')
+                            : null,
+                        iconColor: Colors.purple[600],
+                      ),
+
+                      _buildInfoCard(
+                        'Facebook',
+                        ongData?['facebook'],
+                        Icons.facebook,
+                        onTap: ongData?['facebook'] != null
+                            ? () => _mostrarDetalhesContato(
+                                'Facebook', ongData!['facebook'], 'Facebook')
+                            : null,
+                        iconColor: Colors.blue[800],
+                      ),
+
+                      // Áreas de atuação
+                      _buildAreasAtuacao(),
+
+                      // Horário de funcionamento
+                      _buildHorarioFuncionamento(),
+
+                      const SizedBox(height: 20),
+
+                      // Botão de voltar ao chat
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.chat, color: Colors.white),
+                          label: const Text(
+                            'Voltar ao Chat',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color.fromARGB(255, 1, 37, 54),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
     );
   }
 }

@@ -5,11 +5,13 @@ import 'package:flutter_application_projeto_integrador/TelaAtendimentos.dart';
 
 import 'package:flutter_application_projeto_integrador/cadastroOng.dart';
 import 'package:flutter_application_projeto_integrador/cadastroUsuario.dart';
+import 'package:flutter_application_projeto_integrador/editOng.dart';
 import 'package:flutter_application_projeto_integrador/home.dart';
 import 'package:flutter_application_projeto_integrador/homeOng.dart';
 import 'package:flutter_application_projeto_integrador/homeUser.dart';
 import 'package:flutter_application_projeto_integrador/infoOng.dart';
 import 'package:flutter_application_projeto_integrador/login.dart';
+import 'package:flutter_application_projeto_integrador/perfilOng.dart';
 import 'package:flutter_application_projeto_integrador/postagem.dart';
 import 'package:flutter_application_projeto_integrador/sobrenos.dart';
 import 'package:flutter_application_projeto_integrador/telaChat.dart';
@@ -67,6 +69,8 @@ class MyApp extends StatelessWidget {
         '/contatoUser': (context) => Contato(),
         '/chat': (context) => TelaChat(),
         '/huser': (context) => HomeUser(),
+        '/editarong': (context) => PerfilOng(),
+        '/visong': (context) => VisualizarPerfilOng(),
       },
     );
   }

@@ -29,7 +29,21 @@ class HomeONG extends StatelessWidget {
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [],
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pushNamed(context, '/visong');
+              },
+              icon: const Icon(Icons.account_circle),
+              label: const Text('Visualizar Perfil da ONG'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
         ),
       ),
     );
