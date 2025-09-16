@@ -12,6 +12,7 @@ import 'package:flutter_application_projeto_integrador/homeUser.dart';
 import 'package:flutter_application_projeto_integrador/infoOng.dart';
 import 'package:flutter_application_projeto_integrador/login.dart';
 import 'package:flutter_application_projeto_integrador/perfilOng.dart';
+import 'package:flutter_application_projeto_integrador/perfilUser.dart';
 import 'package:flutter_application_projeto_integrador/postagem.dart';
 import 'package:flutter_application_projeto_integrador/sobrenos.dart';
 import 'package:flutter_application_projeto_integrador/telaChat.dart';
@@ -71,6 +72,7 @@ class MyApp extends StatelessWidget {
         '/huser': (context) => HomeUser(),
         '/editarong': (context) => PerfilOng(),
         '/visong': (context) => VisualizarPerfilOng(),
+        '/perfilUser': (context) => PerfilUsuario(),
       },
     );
   }
