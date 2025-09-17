@@ -20,6 +20,7 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   late String chatId;
   late String userName;
   late String userId;
+  late String userType; // 'user' ou 'ong'
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -43,6 +44,8 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
     chatId = args['chatId'];
     userName = args['userName'];
     userId = args['userId'];
+    userType =
+        args['userType'] ?? 'ong'; // Default para ONG se não especificado
     _messagesRef =
         FirebaseDatabase.instance.ref().child('chats/$chatId/messages');
   }
@@ -82,16 +85,41 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
         .format(DateTime.fromMillisecondsSinceEpoch(timestamp));
   }
 
-  void _openProfile() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PerfilVisualizacao(
-          ongId: userId,
-          ongName: userName,
-        ),
-      ),
-    );
+  void _openProfile() async {
+    // Detecta automaticamente se é ONG ou usuário verificando nas collections
+    try {
+      // Primeiro tenta buscar na collection 'ongs'
+      DocumentSnapshot ongDoc =
+          await FirebaseFirestore.instance.collection('ongs').doc(userId).get();
+
+      if (ongDoc.exists) {
+        // É uma ONG
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PerfilVisualizacao(
+              ongId: userId,
+              ongName: userName,
+            ),
+          ),
+        );
+      } else {
+        // Não é ONG, então é usuário
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PerfilUsuarioVisualizacao(
+              userId: userId,
+              userName: userName,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar perfil: $e')),
+      );
+    }
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
@@ -427,7 +455,7 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   }
 }
 
-// Tela de visualização do perfil da ONG
+// Tela de visualização do perfil da ONG (já existente)
 class PerfilVisualizacao extends StatefulWidget {
   final String ongId;
   final String ongName;
@@ -1010,6 +1038,562 @@ class _PerfilVisualizacaoState extends State<PerfilVisualizacao> {
 
                       // Horário de funcionamento
                       _buildHorarioFuncionamento(),
+
+                      const SizedBox(height: 20),
+
+                      // Botão de voltar ao chat
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.chat, color: Colors.white),
+                          label: const Text(
+                            'Voltar ao Chat',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color.fromARGB(255, 1, 37, 54),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+    );
+  }
+}
+
+// Nova classe para visualização do perfil do usuário
+class PerfilUsuarioVisualizacao extends StatefulWidget {
+  final String userId;
+  final String userName;
+
+  const PerfilUsuarioVisualizacao({
+    super.key,
+    required this.userId,
+    required this.userName,
+  });
+
+  @override
+  State<PerfilUsuarioVisualizacao> createState() =>
+      _PerfilUsuarioVisualizacaoState();
+}
+
+class _PerfilUsuarioVisualizacaoState extends State<PerfilUsuarioVisualizacao> {
+  Map<String, dynamic>? userData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDadosUsuario();
+  }
+
+  Future<void> _carregarDadosUsuario() async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      if (doc.exists) {
+        setState(() {
+          userData = doc.data() as Map<String, dynamic>;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar dados: $e')),
+      );
+    }
+  }
+
+  Future<void> _copiarParaClipboard(String texto, String tipo) async {
+    await Clipboard.setData(ClipboardData(text: texto));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$tipo copiado para a área de transferência'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+      ),
+    );
+  }
+
+  void _mostrarDetalhesContato(String titulo, String conteudo, String tipo) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(titulo),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(conteudo),
+              const SizedBox(height: 16),
+              Text(
+                'Toque em "Copiar" para copiar para a área de transferência.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _copiarParaClipboard(conteudo, tipo);
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+              ),
+              child: const Text(
+                'Copiar',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoCard(String title, String? content, IconData icon,
+      {VoidCallback? onTap, Color? iconColor}) {
+    if (content == null || content.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (iconColor ?? const Color.fromARGB(255, 1, 37, 54))
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor ?? const Color.fromARGB(255, 1, 37, 54),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromARGB(255, 1, 37, 54),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        content,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.grey[400],
+                    size: 16,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAreasInteresse() {
+    if (userData?['areasInteresse'] == null) return const SizedBox.shrink();
+
+    List<String> areas = List<String>.from(userData!['areasInteresse']);
+    if (areas.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        const Color.fromARGB(255, 1, 37, 54).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.favorite,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Áreas de Interesse',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: areas
+                  .map((area) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 1, 37, 54)
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color.fromARGB(255, 1, 37, 54)
+                                .withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          area,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color.fromARGB(255, 1, 37, 54),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatarDataCadastro(dynamic timestamp) {
+    if (timestamp == null) return 'Data não informada';
+
+    try {
+      if (timestamp is Timestamp) {
+        DateTime data = timestamp.toDate();
+        return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+      }
+      return 'Data não informada';
+    } catch (e) {
+      return 'Data não informada';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text(
+          widget.userName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 1, 37, 54),
+              ),
+            )
+          : userData == null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 60,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Perfil não encontrado',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Header com foto e nome
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color.fromARGB(255, 1, 37, 54),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 40,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.userName,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromARGB(255, 1, 37, 54),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (userData?['email'] != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                userData!['email'],
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Informações pessoais
+                      _buildInfoCard(
+                        'CPF',
+                        userData?['cpf']?.isNotEmpty == true
+                            ? userData!['cpf']
+                            : null,
+                        Icons.credit_card,
+                        onTap: userData?['cpf']?.isNotEmpty == true
+                            ? () => _mostrarDetalhesContato(
+                                'CPF', userData!['cpf'], 'CPF')
+                            : null,
+                      ),
+
+                      _buildInfoCard(
+                        'Telefone',
+                        userData?['telefone']?.isNotEmpty == true
+                            ? userData!['telefone']
+                            : null,
+                        Icons.phone,
+                        onTap: userData?['telefone']?.isNotEmpty == true
+                            ? () => _mostrarDetalhesContato(
+                                'Telefone', userData!['telefone'], 'Telefone')
+                            : null,
+                        iconColor: Colors.green[600],
+                      ),
+
+                      _buildInfoCard(
+                        'Data de Nascimento',
+                        userData?['dataNascimento']?.isNotEmpty == true
+                            ? userData!['dataNascimento']
+                            : null,
+                        Icons.cake,
+                      ),
+
+                      _buildInfoCard(
+                        'Endereço',
+                        userData?['endereco']?.isNotEmpty == true
+                            ? userData!['endereco']
+                            : null,
+                        Icons.location_on,
+                        onTap: userData?['endereco']?.isNotEmpty == true
+                            ? () => _mostrarDetalhesContato(
+                                'Endereço', userData!['endereco'], 'Endereço')
+                            : null,
+                        iconColor: Colors.red[600],
+                      ),
+
+                      _buildInfoCard(
+                        'CEP',
+                        userData?['cep']?.isNotEmpty == true
+                            ? userData!['cep']
+                            : null,
+                        Icons.location_city,
+                        onTap: userData?['cep']?.isNotEmpty == true
+                            ? () => _mostrarDetalhesContato(
+                                'CEP', userData!['cep'], 'CEP')
+                            : null,
+                      ),
+
+                      // Áreas de interesse
+                      _buildAreasInteresse(),
+
+                      // Data de cadastro
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color.fromARGB(255, 1, 37, 54)
+                                    .withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.calendar_today,
+                                color: Color.fromARGB(255, 1, 37, 54),
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Membro desde',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color.fromARGB(255, 1, 37, 54),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _formatarDataCadastro(
+                                        userData?['created_at']),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
                       const SizedBox(height: 20),
 
