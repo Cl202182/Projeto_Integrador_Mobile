@@ -11,14 +11,37 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Ícones do Cupertino
   cupertino_icons: ^1.0.8
-  http: any
+  
+  # HTTP para requisições
+  http: ^1.1.0
+  
+  # Firebase Core (sempre necessário)
   firebase_core: ^2.25.4
   firebase_auth: ^4.17.4
   cloud_firestore: ^4.8.3
-  firebase_database: ^10.1.1      
-  intl: ^0.18.0                  
-  file_picker: ^6.1.1  
+  firebase_database: ^10.1.1
+  
+  # Formatação de datas
+  intl: ^0.18.0
+  
+  # Seleção de arquivos (você já tinha)
+  file_picker: ^6.1.1
+  
+  # NOVAS DEPENDÊNCIAS PARA GOOGLE DRIVE + IMAGENS
+  # Google APIs para Drive (versões mais estáveis)
+  googleapis: ^11.4.0
+  googleapis_auth: ^1.4.1
+  
+  # Seleção de imagens da galeria/câmera
+  image_picker: ^1.0.7
+  
+  # Permissões do sistema
+  permission_handler: ^11.3.0
+  
+  # Acesso a diretórios do dispositivo
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:
@@ -29,9 +52,13 @@ flutter:
   uses-material-design: true
 
   assets:
+    # Suas imagens existentes
     - assets/images/Gusta.jpg
     - assets/images/Edu.JPEG
     - assets/images/Graca.jpg
     - assets/images/fundo.jpg
     - assets/images/logo.png
     - assets/images/Lucco.jpg
+    
+    # NOVO: Credenciais do Google Drive
+    - assets/google_drive_credentials.json
