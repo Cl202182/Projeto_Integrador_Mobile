@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class VisualizarPerfilOng extends StatefulWidget {
   const VisualizarPerfilOng({super.key});
@@ -17,6 +18,15 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
   void initState() {
     super.initState();
     carregarDadosOng();
+  }
+
+  // SOLUÇÃO DEFINITIVA: PROXY PARA IMAGENS
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      // Para web, usar proxy CORS que resolve o problema
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl; // Mobile usa URL original
   }
 
   Future<void> carregarDadosOng() async {
@@ -41,6 +51,70 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
         SnackBar(content: Text('Erro ao carregar dados: $e')),
       );
     }
+  }
+
+  // WIDGET DE IMAGEM OTIMIZADO PARA CHROME
+  Widget _buildImagemPerfil() {
+    return Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: const Color.fromARGB(255, 1, 37, 54),
+          width: 3,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(60),
+        child: (dadosOng?['imagemUrl'] != null &&
+                dadosOng!['imagemUrl'].toString().isNotEmpty)
+            ? Image.network(
+                _getProxiedImageUrl(dadosOng!['imagemUrl']),
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: const Color.fromARGB(255, 1, 37, 54),
+                      strokeWidth: 2,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('Erro ao carregar imagem: $error');
+                  return const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 30,
+                        color: Colors.red,
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Erro ao\ncarregar',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              )
+            : const Icon(
+                Icons.business,
+                size: 50,
+                color: Color.fromARGB(255, 1, 37, 54),
+              ),
+      ),
+    );
   }
 
   @override
@@ -98,39 +172,8 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Foto de perfil
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color.fromARGB(255, 1, 37, 54),
-                                width: 3,
-                              ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(60),
-                              child: dadosOng?['imagemUrl'] != null
-                                  ? Image.network(
-                                      dadosOng!['imagemUrl'],
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return const Icon(
-                                          Icons.business,
-                                          size: 50,
-                                          color: Color.fromARGB(255, 1, 37, 54),
-                                        );
-                                      },
-                                    )
-                                  : const Icon(
-                                      Icons.business,
-                                      size: 50,
-                                      color: Color.fromARGB(255, 1, 37, 54),
-                                    ),
-                            ),
-                          ),
+                          // Foto de perfil OTIMIZADA
+                          _buildImagemPerfil(),
                           const SizedBox(height: 30),
 
                           // Botão Editar Perfil
