@@ -80,6 +80,15 @@ class _PerfilOngState extends State<PerfilOng> {
     'Crianças e Adolescentes',
   ];
 
+  // SOLUÇÃO DEFINITIVA: PROXY PARA IMAGENS
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      // Para web, usar proxy CORS que resolve o problema
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl; // Mobile usa URL original
+  }
+
   @override
   void initState() {
     super.initState();
@@ -121,398 +130,6 @@ class _PerfilOngState extends State<PerfilOng> {
       if (mounted) {
         setState(() => isInitializing = false);
       }
-    }
-  }
-
-  // TESTE DETALHADO COMPLETO
-  Future<void> _testeDetalhado() async {
-    print('🔬 INICIANDO TESTE DETALHADO...');
-
-    try {
-      // 1. TESTE BÁSICO DE AUTENTICAÇÃO
-      User? user = FirebaseAuth.instance.currentUser;
-      print('👤 Usuário: ${user?.uid ?? "NÃO AUTENTICADO"}');
-      print('👤 Email: ${user?.email ?? "ANÔNIMO"}');
-      print(
-          '👤 Provider: ${user?.providerData.map((e) => e.providerId).join(", ") ?? "NENHUM"}');
-
-      if (user == null) {
-        print('❌ PROBLEMA: Usuário não autenticado!');
-        return;
-      }
-
-      // 2. TESTE DE PERMISSÕES DO STORAGE
-      print('🔐 Testando permissões do Storage...');
-
-      try {
-        // Teste 1: Listar arquivos (se permitido)
-        ListResult result = await _storage.ref().child('test/').listAll();
-        print('✅ Listagem permitida: ${result.items.length} itens');
-      } catch (e) {
-        print('❌ Listagem negada: $e');
-      }
-
-      // Teste 2: Upload mínimo
-      print('📤 Testando upload mínimo...');
-      Reference testRef = _storage
-          .ref()
-          .child('test/minimal_${DateTime.now().millisecondsSinceEpoch}.txt');
-
-      try {
-        // Upload de apenas 4 bytes
-        Uint8List minimalData = Uint8List.fromList([1, 2, 3, 4]);
-
-        DateTime startTime = DateTime.now();
-        TaskSnapshot snapshot = await testRef.putData(minimalData);
-        DateTime endTime = DateTime.now();
-
-        Duration uploadTime = endTime.difference(startTime);
-        print('✅ Upload mínimo OK em: ${uploadTime.inMilliseconds}ms');
-
-        // Teste 3: Obter URL
-        DateTime startUrl = DateTime.now();
-        String url = await snapshot.ref.getDownloadURL();
-        DateTime endUrl = DateTime.now();
-
-        Duration urlTime = endUrl.difference(startUrl);
-        print('✅ URL obtida em: ${urlTime.inMilliseconds}ms');
-        print('🔗 URL: ${url.substring(0, 100)}...');
-
-        // Teste 4: Deletar
-        await testRef.delete();
-        print('✅ Arquivo deletado');
-
-        // ANÁLISE DOS TEMPOS
-        if (uploadTime.inSeconds > 5) {
-          print(
-              '⚠️ PROBLEMA: Upload muito lento (${uploadTime.inSeconds}s para 4 bytes)');
-          print('💡 CAUSA PROVÁVEL: Conexão lenta ou problema de rede');
-        }
-
-        if (urlTime.inSeconds > 2) {
-          print('⚠️ PROBLEMA: Obtenção de URL lenta (${urlTime.inSeconds}s)');
-          print('💡 CAUSA PROVÁVEL: Problema de configuração do Firebase');
-        }
-      } catch (e) {
-        print('❌ ERRO NO UPLOAD MÍNIMO: $e');
-
-        if (e.toString().contains('unauthorized')) {
-          print('💡 CAUSA: Regras de segurança bloqueando');
-        } else if (e.toString().contains('network')) {
-          print('💡 CAUSA: Problema de rede');
-        } else if (e.toString().contains('cors')) {
-          print('💡 CAUSA: Problema de CORS (web)');
-        } else {
-          print('💡 CAUSA: Desconhecida - $e');
-        }
-      }
-
-      // 3. TESTE DE VELOCIDADE DA INTERNET
-      print('🌐 Testando velocidade...');
-      DateTime pingStart = DateTime.now();
-
-      try {
-        await FirebaseFirestore.instance
-            .collection('test')
-            .doc('ping')
-            .set({'timestamp': Timestamp.now()});
-
-        DateTime pingEnd = DateTime.now();
-        Duration pingTime = pingEnd.difference(pingStart);
-
-        print('📡 Ping Firestore: ${pingTime.inMilliseconds}ms');
-
-        if (pingTime.inSeconds > 3) {
-          print('⚠️ CONEXÃO MUITO LENTA!');
-          print('💡 Isso explica o timeout no Storage');
-        }
-      } catch (e) {
-        print('❌ Erro no ping: $e');
-      }
-
-      // 4. INFORMAÇÕES DO AMBIENTE
-      print('📱 Plataforma: ${kIsWeb ? "WEB" : Platform.operatingSystem}');
-      print('🔧 Debug mode: ${kDebugMode}');
-
-      // 5. TESTE DE CONECTIVIDADE
-      var connectivityResult = await Connectivity().checkConnectivity();
-      print('🌐 Conectividade: $connectivityResult');
-
-      // 6. TESTE DE IMAGEM REAL (pequena)
-      print('🖼️ Testando imagem pequena...');
-
-      try {
-        // Criar uma imagem JPEG mínima válida (1x1 pixel)
-        Uint8List smallImage = Uint8List.fromList([
-          0xFF,
-          0xD8,
-          0xFF,
-          0xE0,
-          0x00,
-          0x10,
-          0x4A,
-          0x46,
-          0x49,
-          0x46,
-          0x00,
-          0x01,
-          0x01,
-          0x01,
-          0x00,
-          0x48,
-          0x00,
-          0x48,
-          0x00,
-          0x00,
-          0xFF,
-          0xC0,
-          0x00,
-          0x11,
-          0x08,
-          0x00,
-          0x01,
-          0x00,
-          0x01,
-          0x01,
-          0x01,
-          0x11,
-          0x00,
-          0x02,
-          0x11,
-          0x01,
-          0x03,
-          0x11,
-          0x01,
-          0xFF,
-          0xC4,
-          0x00,
-          0x14,
-          0x00,
-          0x01,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x08,
-          0xFF,
-          0xC4,
-          0x00,
-          0x14,
-          0x10,
-          0x01,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0xFF,
-          0xDA,
-          0x00,
-          0x0C,
-          0x03,
-          0x01,
-          0x00,
-          0x02,
-          0x11,
-          0x03,
-          0x11,
-          0x00,
-          0x3F,
-          0x00,
-          0x80,
-          0xFF,
-          0xD9
-        ]);
-
-        Reference imageRef = _storage.ref().child(
-            'test/small_image_${DateTime.now().millisecondsSinceEpoch}.jpg');
-
-        DateTime imageStart = DateTime.now();
-        TaskSnapshot imageSnapshot = await imageRef.putData(smallImage);
-        DateTime imageEnd = DateTime.now();
-
-        Duration imageTime = imageEnd.difference(imageStart);
-        print(
-            '✅ Imagem pequena (${smallImage.length} bytes) OK em: ${imageTime.inMilliseconds}ms');
-
-        await imageRef.delete();
-
-        if (imageTime.inSeconds > 10) {
-          print('⚠️ PROBLEMA: Upload de imagem muito lento!');
-          print(
-              '💡 CAUSA PROVÁVEL: Problema específico com imagens ou Storage');
-        }
-      } catch (e) {
-        print('❌ Erro com imagem: $e');
-      }
-    } catch (e) {
-      print('💥 ERRO GERAL NO TESTE: $e');
-    }
-
-    print('🏁 TESTE DETALHADO CONCLUÍDO');
-  }
-
-  // TESTE ALTERNATIVO PARA STORAGE
-  Future<void> _testeStorageAlternativo() async {
-    print('🔄 Testando Storage com método alternativo...');
-
-    try {
-      // Método 1: Testar com referência direta
-      Reference ref = FirebaseStorage.instance.ref();
-      print('✅ Referência criada: ${ref.bucket}');
-
-      // Método 2: Testar com timeout menor
-      try {
-        Reference testRef = ref.child('test_simples.txt');
-        Uint8List data = Uint8List.fromList([1, 2, 3]);
-
-        // Upload com timeout de apenas 5 segundos
-        TaskSnapshot result = await testRef.putData(data).timeout(
-              const Duration(seconds: 5),
-            );
-
-        print('✅ Upload alternativo funcionou!');
-        await testRef.delete();
-      } catch (e) {
-        print('❌ Upload alternativo falhou: $e');
-
-        // Método 3: Testar apenas criação de referência
-        try {
-          String bucket = FirebaseStorage.instance.ref().bucket;
-          print('✅ Bucket acessível: $bucket');
-        } catch (e2) {
-          print('❌ Bucket inacessível: $e2');
-          print('💡 SOLUÇÃO: Precisa reconfigurar o Storage');
-        }
-      }
-    } catch (e) {
-      print('❌ Erro geral no Storage: $e');
-
-      if (e.toString().contains('retry-limit-exceeded')) {
-        print('💡 CAUSA: Problema de conectividade com Firebase Storage');
-        print('🔧 SOLUÇÕES:');
-        print('   1. Aguardar alguns minutos');
-        print('   2. Verificar região do Storage');
-        print('   3. Testar com VPN');
-        print('   4. Reconfigurar Storage (não recriar)');
-      }
-    }
-  }
-
-  // MÉTODO DE TESTE DE CONEXÃO BÁSICO
-  Future<bool> _testarConexaoFirebaseStorage() async {
-    try {
-      print('🔍 Testando conexão com Firebase Storage...');
-
-      var connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult == ConnectivityResult.none) {
-        print('❌ Sem conexão com a internet');
-        return false;
-      }
-      print('✅ Conexão com internet: $connectivityResult');
-
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('❌ Usuário não autenticado');
-        return false;
-      }
-      print('✅ Usuário autenticado: ${user.uid}');
-
-      try {
-        Reference testRef = _storage.ref().child('test/connection_test.txt');
-        Uint8List testData = Uint8List.fromList('test'.codeUnits);
-
-        print('🔄 Testando upload...');
-        TaskSnapshot snapshot = await testRef.putData(testData).timeout(
-              const Duration(seconds: 60),
-              onTimeout: () => throw TimeoutException(
-                  'Timeout no teste de upload', const Duration(seconds: 60)),
-            );
-
-        if (snapshot.state == TaskState.success) {
-          print('✅ Upload de teste bem-sucedido');
-
-          String downloadUrl = await testRef.getDownloadURL();
-          print('✅ URL obtida: ${downloadUrl.substring(0, 50)}...');
-
-          await testRef.delete();
-          print('✅ Arquivo de teste removido');
-
-          return true;
-        } else {
-          print('❌ Upload de teste falhou: ${snapshot.state}');
-          return false;
-        }
-      } catch (e) {
-        print('❌ Erro no teste de Storage: $e');
-        return false;
-      }
-    } catch (e) {
-      print('❌ Erro geral no teste: $e');
-      return false;
-    }
-  }
-
-  Future<void> _verificarRegrasSeguranca() async {
-    try {
-      print('🔍 Verificando regras de segurança...');
-
-      String? uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) {
-        print('❌ Usuário não autenticado para verificar regras');
-        return;
-      }
-
-      try {
-        DocumentSnapshot doc = await FirebaseFirestore.instance
-            .collection('ongs')
-            .doc(uid)
-            .get()
-            .timeout(const Duration(seconds: 30));
-
-        if (doc.exists) {
-          print('✅ Leitura no Firestore permitida');
-        } else {
-          print('⚠️ Documento não existe no Firestore');
-        }
-      } catch (e) {
-        print('❌ Erro na leitura do Firestore: $e');
-      }
-
-      try {
-        await FirebaseFirestore.instance
-            .collection('ongs')
-            .doc(uid)
-            .update({'teste_conexao': Timestamp.now()}).timeout(
-                const Duration(seconds: 30));
-        print('✅ Escrita no Firestore permitida');
-      } catch (e) {
-        print('❌ Erro na escrita do Firestore: $e');
-      }
-    } catch (e) {
-      print('❌ Erro na verificação de regras: $e');
     }
   }
 
@@ -625,8 +242,6 @@ class _PerfilOngState extends State<PerfilOng> {
         throw Exception('Usuário não autenticado');
       }
 
-      await _verificarRegrasSeguranca();
-
       String? novaImagemUrl = await _uploadComDiagnostico(
         imageBytes: imageBytes,
         uid: uid,
@@ -672,11 +287,6 @@ class _PerfilOngState extends State<PerfilOng> {
             'Imagem muito grande: ${(imageBytes.length / 1024 / 1024).toStringAsFixed(2)}MB');
       }
 
-      bool conexaoOk = await _testarConexaoFirebaseStorage();
-      if (!conexaoOk) {
-        throw Exception('Falha na conexão com Firebase Storage');
-      }
-
       _cancelCurrentUpload();
 
       String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
@@ -687,12 +297,17 @@ class _PerfilOngState extends State<PerfilOng> {
       Reference ref = _storage.ref().child('ongs/perfil/$fileName');
       print('📍 Caminho: ${ref.fullPath}');
 
+      // METADADOS OTIMIZADOS PARA WEB/CHROME
       SettableMetadata metadata = SettableMetadata(
         contentType: 'image/jpeg',
-        cacheControl: 'max-age=3600',
+        cacheControl: 'public, max-age=31536000', // Cache por 1 ano
         customMetadata: {
           'uploadedBy': uid,
           'uploadTime': timestamp,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers':
+              'Origin, X-Requested-With, Content-Type, Accept, Authorization',
         },
       );
 
@@ -706,7 +321,6 @@ class _PerfilOngState extends State<PerfilOng> {
 
           print(
               '📈 Progresso: $progressPercent% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)');
-          print('🔄 Estado: ${snapshot.state}');
         },
         onError: (error) {
           print('❌ Erro no stream: $error');
@@ -759,57 +373,6 @@ class _PerfilOngState extends State<PerfilOng> {
       _uploadSubscription?.cancel();
       _uploadSubscription = null;
     }
-  }
-
-  // BOTÕES DE TESTE
-  Widget _botaoTesteBasico() {
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-        ),
-        onPressed: () async {
-          print('🧪 Iniciando teste básico...');
-          bool resultado = await _testarConexaoFirebaseStorage();
-          print(resultado ? '✅ Teste básico OK!' : '❌ Teste básico falhou!');
-        },
-        child: const Text('🧪 Teste Básico'),
-      ),
-    );
-  }
-
-  Widget _botaoTesteDetalhado() {
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-        ),
-        onPressed: () async {
-          await _testeDetalhado();
-        },
-        child: const Text('🔬 Teste Detalhado'),
-      ),
-    );
-  }
-
-  Widget _botaoTesteAlternativo() {
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-          foregroundColor: Colors.white,
-        ),
-        onPressed: () async {
-          await _testeStorageAlternativo();
-        },
-        child: const Text('🔄 Teste Alt'),
-      ),
-    );
   }
 
   void _mostrarSnackBar(String mensagem, Color cor) {
@@ -1184,6 +747,92 @@ class _PerfilOngState extends State<PerfilOng> {
     );
   }
 
+  // WIDGET DE IMAGEM OTIMIZADO PARA CHROME
+  Widget _buildImagemPerfil() {
+    return GestureDetector(
+      onTap: isUploadingImage ? null : selecionarImagem,
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: const Color.fromARGB(255, 1, 37, 54),
+            width: 3,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(60),
+          child: isUploadingImage
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        color: Color.fromARGB(255, 1, 37, 54),
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Enviando...',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color.fromARGB(255, 1, 37, 54),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : (imagemUrl != null && imagemUrl!.isNotEmpty)
+                  ? Image.network(
+                      _getProxiedImageUrl(imagemUrl!),
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: const Color.fromARGB(255, 1, 37, 54),
+                            strokeWidth: 2,
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Erro ao carregar imagem: $error');
+                        return const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 30,
+                              color: Colors.red,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Erro ao\ncarregar',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    )
+                  : const Icon(
+                      Icons.camera_alt,
+                      size: 50,
+                      color: Color.fromARGB(255, 1, 37, 54),
+                    ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double larguraTela = MediaQuery.of(context).size.width;
@@ -1227,17 +876,6 @@ class _PerfilOngState extends State<PerfilOng> {
                     child: Column(
                       children: [
                         const SizedBox(height: 20),
-
-                        // BOTÕES DE TESTE (TEMPORÁRIOS - REMOVA DEPOIS)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _botaoTesteBasico(),
-                            _botaoTesteDetalhado(),
-                            _botaoTesteAlternativo(),
-                          ],
-                        ),
-
                         Container(
                           width: larguraTela * 0.95,
                           padding: const EdgeInsets.all(20),
@@ -1260,110 +898,8 @@ class _PerfilOngState extends State<PerfilOng> {
                                 ),
                                 const SizedBox(height: 30),
 
-                                // Foto de perfil
-                                GestureDetector(
-                                  onTap: isUploadingImage
-                                      ? null
-                                      : selecionarImagem,
-                                  child: Container(
-                                    width: 120,
-                                    height: 120,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: const Color.fromARGB(
-                                            255, 1, 37, 54),
-                                        width: 3,
-                                      ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(60),
-                                      child: isUploadingImage
-                                          ? const Center(
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  CircularProgressIndicator(
-                                                    color: Color.fromARGB(
-                                                        255, 1, 37, 54),
-                                                    strokeWidth: 3,
-                                                  ),
-                                                  SizedBox(height: 8),
-                                                  Text(
-                                                    'Enviando...',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: Color.fromARGB(
-                                                          255, 1, 37, 54),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            )
-                                          : (imagemUrl != null &&
-                                                  imagemUrl!.isNotEmpty)
-                                              ? Image.network(
-                                                  imagemUrl!,
-                                                  fit: BoxFit.cover,
-                                                  loadingBuilder: (context,
-                                                      child, loadingProgress) {
-                                                    if (loadingProgress == null)
-                                                      return child;
-                                                    return Center(
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                        color: const Color
-                                                            .fromARGB(
-                                                            255, 1, 37, 54),
-                                                        strokeWidth: 2,
-                                                        value: loadingProgress
-                                                                    .expectedTotalBytes !=
-                                                                null
-                                                            ? loadingProgress
-                                                                    .cumulativeBytesLoaded /
-                                                                loadingProgress
-                                                                    .expectedTotalBytes!
-                                                            : null,
-                                                      ),
-                                                    );
-                                                  },
-                                                  errorBuilder: (context, error,
-                                                      stackTrace) {
-                                                    print(
-                                                        'Erro ao carregar imagem: $error');
-                                                    return const Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.error_outline,
-                                                          size: 30,
-                                                          color: Colors.red,
-                                                        ),
-                                                        SizedBox(height: 4),
-                                                        Text(
-                                                          'Erro ao\ncarregar',
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style: TextStyle(
-                                                            fontSize: 10,
-                                                            color: Colors.red,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    );
-                                                  },
-                                                )
-                                              : const Icon(
-                                                  Icons.camera_alt,
-                                                  size: 50,
-                                                  color: Color.fromARGB(
-                                                      255, 1, 37, 54),
-                                                ),
-                                    ),
-                                  ),
-                                ),
+                                // Foto de perfil OTIMIZADA
+                                _buildImagemPerfil(),
                                 const SizedBox(height: 10),
                                 Text(
                                   isUploadingImage
