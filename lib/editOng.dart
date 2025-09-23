@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import '../services/google_drive_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:typed_data';
+import 'dart:io';
+import 'dart:async';
 
 extension StringExtension on String {
   String capitalize() {
@@ -42,6 +44,7 @@ class _PerfilOngState extends State<PerfilOng> {
   bool isUploadingImage = false;
   bool imagemFoiAlterada = false;
   bool isInitializing = true;
+
   List<String> areasAtuacao = [];
   Map<String, String> horarioFuncionamento = {
     'segunda': '',
@@ -55,7 +58,14 @@ class _PerfilOngState extends State<PerfilOng> {
 
   // Serviços
   final ImagePicker _picker = ImagePicker();
-  final GoogleDriveService _driveService = GoogleDriveService();
+  // CONFIGURAÇÃO OTIMIZADA - BUCKET BRASIL (REGIÃO SA)
+  final FirebaseStorage _storage = FirebaseStorage.instanceFor(
+      bucket: 'gs://portal-ongs.firebasestorage.app' // Bucket regional SA
+      );
+
+  // Controle de upload
+  UploadTask? _currentUploadTask;
+  StreamSubscription<TaskSnapshot>? _uploadSubscription;
 
   final List<String> areasDisponiveis = [
     'Educação',
@@ -78,6 +88,12 @@ class _PerfilOngState extends State<PerfilOng> {
 
   @override
   void dispose() {
+    _cancelCurrentUpload();
+    _disposeControllers();
+    super.dispose();
+  }
+
+  void _disposeControllers() {
     nomeController.dispose();
     descricaoController.dispose();
     telefoneController.dispose();
@@ -86,50 +102,417 @@ class _PerfilOngState extends State<PerfilOng> {
     siteController.dispose();
     instagramController.dispose();
     facebookController.dispose();
-    super.dispose();
   }
 
-  /// Inicializa os serviços e carrega dados
+  void _cancelCurrentUpload() {
+    _uploadSubscription?.cancel();
+    _currentUploadTask?.cancel();
+    _currentUploadTask = null;
+    _uploadSubscription = null;
+  }
+
   Future<void> _initializeServices() async {
     try {
-      setState(() {
-        isInitializing = true;
-      });
-
-      // Carregar dados do perfil primeiro
+      setState(() => isInitializing = true);
       await carregarDadosPerfil();
-
-      // Inicializar Google Drive em paralelo
-      _initializeGoogleDriveInBackground();
     } catch (e) {
       print('Erro na inicialização: $e');
-      _mostrarSnackBar('Erro ao carregar dados do perfil', Colors.red);
     } finally {
       if (mounted) {
-        setState(() {
-          isInitializing = false;
-        });
+        setState(() => isInitializing = false);
       }
     }
   }
 
-  /// Inicializa o Google Drive em background
-  void _initializeGoogleDriveInBackground() async {
-    try {
-      print('Inicializando Google Drive em background...');
-      await _driveService.initialize();
-      print('Google Drive inicializado com sucesso');
+  // TESTE DETALHADO COMPLETO
+  Future<void> _testeDetalhado() async {
+    print('🔬 INICIANDO TESTE DETALHADO...');
 
-      if (mounted) {
-        setState(
-            () {}); // Atualiza a UI para refletir que o serviço está disponível
+    try {
+      // 1. TESTE BÁSICO DE AUTENTICAÇÃO
+      User? user = FirebaseAuth.instance.currentUser;
+      print('👤 Usuário: ${user?.uid ?? "NÃO AUTENTICADO"}');
+      print('👤 Email: ${user?.email ?? "ANÔNIMO"}');
+      print(
+          '👤 Provider: ${user?.providerData.map((e) => e.providerId).join(", ") ?? "NENHUM"}');
+
+      if (user == null) {
+        print('❌ PROBLEMA: Usuário não autenticado!');
+        return;
+      }
+
+      // 2. TESTE DE PERMISSÕES DO STORAGE
+      print('🔐 Testando permissões do Storage...');
+
+      try {
+        // Teste 1: Listar arquivos (se permitido)
+        ListResult result = await _storage.ref().child('test/').listAll();
+        print('✅ Listagem permitida: ${result.items.length} itens');
+      } catch (e) {
+        print('❌ Listagem negada: $e');
+      }
+
+      // Teste 2: Upload mínimo
+      print('📤 Testando upload mínimo...');
+      Reference testRef = _storage
+          .ref()
+          .child('test/minimal_${DateTime.now().millisecondsSinceEpoch}.txt');
+
+      try {
+        // Upload de apenas 4 bytes
+        Uint8List minimalData = Uint8List.fromList([1, 2, 3, 4]);
+
+        DateTime startTime = DateTime.now();
+        TaskSnapshot snapshot = await testRef.putData(minimalData);
+        DateTime endTime = DateTime.now();
+
+        Duration uploadTime = endTime.difference(startTime);
+        print('✅ Upload mínimo OK em: ${uploadTime.inMilliseconds}ms');
+
+        // Teste 3: Obter URL
+        DateTime startUrl = DateTime.now();
+        String url = await snapshot.ref.getDownloadURL();
+        DateTime endUrl = DateTime.now();
+
+        Duration urlTime = endUrl.difference(startUrl);
+        print('✅ URL obtida em: ${urlTime.inMilliseconds}ms');
+        print('🔗 URL: ${url.substring(0, 100)}...');
+
+        // Teste 4: Deletar
+        await testRef.delete();
+        print('✅ Arquivo deletado');
+
+        // ANÁLISE DOS TEMPOS
+        if (uploadTime.inSeconds > 5) {
+          print(
+              '⚠️ PROBLEMA: Upload muito lento (${uploadTime.inSeconds}s para 4 bytes)');
+          print('💡 CAUSA PROVÁVEL: Conexão lenta ou problema de rede');
+        }
+
+        if (urlTime.inSeconds > 2) {
+          print('⚠️ PROBLEMA: Obtenção de URL lenta (${urlTime.inSeconds}s)');
+          print('💡 CAUSA PROVÁVEL: Problema de configuração do Firebase');
+        }
+      } catch (e) {
+        print('❌ ERRO NO UPLOAD MÍNIMO: $e');
+
+        if (e.toString().contains('unauthorized')) {
+          print('💡 CAUSA: Regras de segurança bloqueando');
+        } else if (e.toString().contains('network')) {
+          print('💡 CAUSA: Problema de rede');
+        } else if (e.toString().contains('cors')) {
+          print('💡 CAUSA: Problema de CORS (web)');
+        } else {
+          print('💡 CAUSA: Desconhecida - $e');
+        }
+      }
+
+      // 3. TESTE DE VELOCIDADE DA INTERNET
+      print('🌐 Testando velocidade...');
+      DateTime pingStart = DateTime.now();
+
+      try {
+        await FirebaseFirestore.instance
+            .collection('test')
+            .doc('ping')
+            .set({'timestamp': Timestamp.now()});
+
+        DateTime pingEnd = DateTime.now();
+        Duration pingTime = pingEnd.difference(pingStart);
+
+        print('📡 Ping Firestore: ${pingTime.inMilliseconds}ms');
+
+        if (pingTime.inSeconds > 3) {
+          print('⚠️ CONEXÃO MUITO LENTA!');
+          print('💡 Isso explica o timeout no Storage');
+        }
+      } catch (e) {
+        print('❌ Erro no ping: $e');
+      }
+
+      // 4. INFORMAÇÕES DO AMBIENTE
+      print('📱 Plataforma: ${kIsWeb ? "WEB" : Platform.operatingSystem}');
+      print('🔧 Debug mode: ${kDebugMode}');
+
+      // 5. TESTE DE CONECTIVIDADE
+      var connectivityResult = await Connectivity().checkConnectivity();
+      print('🌐 Conectividade: $connectivityResult');
+
+      // 6. TESTE DE IMAGEM REAL (pequena)
+      print('🖼️ Testando imagem pequena...');
+
+      try {
+        // Criar uma imagem JPEG mínima válida (1x1 pixel)
+        Uint8List smallImage = Uint8List.fromList([
+          0xFF,
+          0xD8,
+          0xFF,
+          0xE0,
+          0x00,
+          0x10,
+          0x4A,
+          0x46,
+          0x49,
+          0x46,
+          0x00,
+          0x01,
+          0x01,
+          0x01,
+          0x00,
+          0x48,
+          0x00,
+          0x48,
+          0x00,
+          0x00,
+          0xFF,
+          0xC0,
+          0x00,
+          0x11,
+          0x08,
+          0x00,
+          0x01,
+          0x00,
+          0x01,
+          0x01,
+          0x01,
+          0x11,
+          0x00,
+          0x02,
+          0x11,
+          0x01,
+          0x03,
+          0x11,
+          0x01,
+          0xFF,
+          0xC4,
+          0x00,
+          0x14,
+          0x00,
+          0x01,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x08,
+          0xFF,
+          0xC4,
+          0x00,
+          0x14,
+          0x10,
+          0x01,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0xFF,
+          0xDA,
+          0x00,
+          0x0C,
+          0x03,
+          0x01,
+          0x00,
+          0x02,
+          0x11,
+          0x03,
+          0x11,
+          0x00,
+          0x3F,
+          0x00,
+          0x80,
+          0xFF,
+          0xD9
+        ]);
+
+        Reference imageRef = _storage.ref().child(
+            'test/small_image_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+        DateTime imageStart = DateTime.now();
+        TaskSnapshot imageSnapshot = await imageRef.putData(smallImage);
+        DateTime imageEnd = DateTime.now();
+
+        Duration imageTime = imageEnd.difference(imageStart);
+        print(
+            '✅ Imagem pequena (${smallImage.length} bytes) OK em: ${imageTime.inMilliseconds}ms');
+
+        await imageRef.delete();
+
+        if (imageTime.inSeconds > 10) {
+          print('⚠️ PROBLEMA: Upload de imagem muito lento!');
+          print(
+              '💡 CAUSA PROVÁVEL: Problema específico com imagens ou Storage');
+        }
+      } catch (e) {
+        print('❌ Erro com imagem: $e');
       }
     } catch (e) {
-      print('Erro ao inicializar Google Drive: $e');
-      if (mounted) {
-        _mostrarSnackBar(
-            'Aviso: Serviço de imagens pode estar indisponível', Colors.orange);
+      print('💥 ERRO GERAL NO TESTE: $e');
+    }
+
+    print('🏁 TESTE DETALHADO CONCLUÍDO');
+  }
+
+  // TESTE ALTERNATIVO PARA STORAGE
+  Future<void> _testeStorageAlternativo() async {
+    print('🔄 Testando Storage com método alternativo...');
+
+    try {
+      // Método 1: Testar com referência direta
+      Reference ref = FirebaseStorage.instance.ref();
+      print('✅ Referência criada: ${ref.bucket}');
+
+      // Método 2: Testar com timeout menor
+      try {
+        Reference testRef = ref.child('test_simples.txt');
+        Uint8List data = Uint8List.fromList([1, 2, 3]);
+
+        // Upload com timeout de apenas 5 segundos
+        TaskSnapshot result = await testRef.putData(data).timeout(
+              const Duration(seconds: 5),
+            );
+
+        print('✅ Upload alternativo funcionou!');
+        await testRef.delete();
+      } catch (e) {
+        print('❌ Upload alternativo falhou: $e');
+
+        // Método 3: Testar apenas criação de referência
+        try {
+          String bucket = FirebaseStorage.instance.ref().bucket;
+          print('✅ Bucket acessível: $bucket');
+        } catch (e2) {
+          print('❌ Bucket inacessível: $e2');
+          print('💡 SOLUÇÃO: Precisa reconfigurar o Storage');
+        }
       }
+    } catch (e) {
+      print('❌ Erro geral no Storage: $e');
+
+      if (e.toString().contains('retry-limit-exceeded')) {
+        print('💡 CAUSA: Problema de conectividade com Firebase Storage');
+        print('🔧 SOLUÇÕES:');
+        print('   1. Aguardar alguns minutos');
+        print('   2. Verificar região do Storage');
+        print('   3. Testar com VPN');
+        print('   4. Reconfigurar Storage (não recriar)');
+      }
+    }
+  }
+
+  // MÉTODO DE TESTE DE CONEXÃO BÁSICO
+  Future<bool> _testarConexaoFirebaseStorage() async {
+    try {
+      print('🔍 Testando conexão com Firebase Storage...');
+
+      var connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        print('❌ Sem conexão com a internet');
+        return false;
+      }
+      print('✅ Conexão com internet: $connectivityResult');
+
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('❌ Usuário não autenticado');
+        return false;
+      }
+      print('✅ Usuário autenticado: ${user.uid}');
+
+      try {
+        Reference testRef = _storage.ref().child('test/connection_test.txt');
+        Uint8List testData = Uint8List.fromList('test'.codeUnits);
+
+        print('🔄 Testando upload...');
+        TaskSnapshot snapshot = await testRef.putData(testData).timeout(
+              const Duration(seconds: 60),
+              onTimeout: () => throw TimeoutException(
+                  'Timeout no teste de upload', const Duration(seconds: 60)),
+            );
+
+        if (snapshot.state == TaskState.success) {
+          print('✅ Upload de teste bem-sucedido');
+
+          String downloadUrl = await testRef.getDownloadURL();
+          print('✅ URL obtida: ${downloadUrl.substring(0, 50)}...');
+
+          await testRef.delete();
+          print('✅ Arquivo de teste removido');
+
+          return true;
+        } else {
+          print('❌ Upload de teste falhou: ${snapshot.state}');
+          return false;
+        }
+      } catch (e) {
+        print('❌ Erro no teste de Storage: $e');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erro geral no teste: $e');
+      return false;
+    }
+  }
+
+  Future<void> _verificarRegrasSeguranca() async {
+    try {
+      print('🔍 Verificando regras de segurança...');
+
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        print('❌ Usuário não autenticado para verificar regras');
+        return;
+      }
+
+      try {
+        DocumentSnapshot doc = await FirebaseFirestore.instance
+            .collection('ongs')
+            .doc(uid)
+            .get()
+            .timeout(const Duration(seconds: 30));
+
+        if (doc.exists) {
+          print('✅ Leitura no Firestore permitida');
+        } else {
+          print('⚠️ Documento não existe no Firestore');
+        }
+      } catch (e) {
+        print('❌ Erro na leitura do Firestore: $e');
+      }
+
+      try {
+        await FirebaseFirestore.instance
+            .collection('ongs')
+            .doc(uid)
+            .update({'teste_conexao': Timestamp.now()}).timeout(
+                const Duration(seconds: 30));
+        print('✅ Escrita no Firestore permitida');
+      } catch (e) {
+        print('❌ Erro na escrita do Firestore: $e');
+      }
+    } catch (e) {
+      print('❌ Erro na verificação de regras: $e');
     }
   }
 
@@ -142,7 +525,6 @@ class _PerfilOngState extends State<PerfilOng> {
 
         if (doc.exists) {
           Map<String, dynamic> dados = doc.data() as Map<String, dynamic>;
-
           if (mounted) {
             setState(() {
               nomeController.text = dados['nome'] ?? '';
@@ -153,12 +535,9 @@ class _PerfilOngState extends State<PerfilOng> {
               siteController.text = dados['site'] ?? '';
               instagramController.text = dados['instagram'] ?? '';
               facebookController.text = dados['facebook'] ?? '';
-
               imagemUrlOriginal = dados['imagemUrl'];
               imagemUrl = dados['imagemUrl'];
-
               areasAtuacao = List<String>.from(dados['areasAtuacao'] ?? []);
-
               if (dados['horarioFuncionamento'] != null) {
                 horarioFuncionamento =
                     Map<String, String>.from(dados['horarioFuncionamento']);
@@ -169,15 +548,11 @@ class _PerfilOngState extends State<PerfilOng> {
       }
     } catch (e) {
       print('Erro ao carregar dados: $e');
-      _mostrarSnackBar('Erro ao carregar dados: $e', Colors.red);
     }
   }
 
-  /// Solicita permissões necessárias (apenas para mobile)
   Future<bool> _solicitarPermissoes() async {
-    if (kIsWeb) {
-      return true;
-    }
+    if (kIsWeb) return true;
 
     try {
       if (Platform.isAndroid) {
@@ -186,7 +561,6 @@ class _PerfilOngState extends State<PerfilOng> {
           Permission.storage,
           Permission.photos,
         ].request();
-
         return permissions.values
             .any((status) => status == PermissionStatus.granted);
       } else if (Platform.isIOS) {
@@ -194,11 +568,9 @@ class _PerfilOngState extends State<PerfilOng> {
           Permission.camera,
           Permission.photos,
         ].request();
-
         return permissions.values
             .any((status) => status == PermissionStatus.granted);
       }
-
       return true;
     } catch (e) {
       print('Erro ao solicitar permissões: $e');
@@ -206,22 +578,256 @@ class _PerfilOngState extends State<PerfilOng> {
     }
   }
 
-  /// Função principal para selecionar imagem
-  Future<void> selecionarImagem() async {
-    print('Função selecionarImagem chamada');
+  Future<void> _selecionarImagem(ImageSource source) async {
+    try {
+      print('📱 Selecionando imagem da fonte: $source');
+      _cancelCurrentUpload();
 
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        print('📸 Imagem selecionada: ${image.name}');
+
+        final fileSize = await image.length();
+        print(
+            '📊 Tamanho do arquivo: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+        if (fileSize > 5 * 1024 * 1024) {
+          print('❌ Imagem muito grande');
+          return;
+        }
+
+        final bytes = await image.readAsBytes();
+        await _processarImagemComDiagnostico(bytes);
+      } else {
+        print('❌ Nenhuma imagem selecionada');
+      }
+    } catch (e) {
+      print('💥 Erro ao selecionar imagem: $e');
+    }
+  }
+
+  Future<void> _processarImagemComDiagnostico(Uint8List imageBytes) async {
+    if (!mounted) return;
+
+    setState(() => isUploadingImage = true);
+
+    try {
+      print('🎯 Iniciando processamento da imagem...');
+
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      await _verificarRegrasSeguranca();
+
+      String? novaImagemUrl = await _uploadComDiagnostico(
+        imageBytes: imageBytes,
+        uid: uid,
+      ).timeout(
+        const Duration(minutes: 15),
+        onTimeout: () {
+          throw TimeoutException('Upload demorou muito para completar',
+              const Duration(minutes: 15));
+        },
+      );
+
+      if (novaImagemUrl != null && novaImagemUrl.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            imagemUrl = novaImagemUrl;
+            imagemFoiAlterada = true;
+          });
+
+          print('🎉 Imagem processada com sucesso!');
+        }
+      } else {
+        throw Exception('URL da imagem está vazia');
+      }
+    } catch (e) {
+      print('💥 Erro no processamento: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<String?> _uploadComDiagnostico({
+    required Uint8List imageBytes,
+    required String uid,
+  }) async {
+    try {
+      print('🚀 Iniciando upload com diagnóstico...');
+      print('📊 Tamanho da imagem: ${imageBytes.length} bytes');
+
+      if (imageBytes.length > 10 * 1024 * 1024) {
+        throw Exception(
+            'Imagem muito grande: ${(imageBytes.length / 1024 / 1024).toStringAsFixed(2)}MB');
+      }
+
+      bool conexaoOk = await _testarConexaoFirebaseStorage();
+      if (!conexaoOk) {
+        throw Exception('Falha na conexão com Firebase Storage');
+      }
+
+      _cancelCurrentUpload();
+
+      String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      String fileName = 'perfil_${uid}_$timestamp.jpg';
+
+      print('📁 Nome do arquivo: $fileName');
+
+      Reference ref = _storage.ref().child('ongs/perfil/$fileName');
+      print('📍 Caminho: ${ref.fullPath}');
+
+      SettableMetadata metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'max-age=3600',
+        customMetadata: {
+          'uploadedBy': uid,
+          'uploadTime': timestamp,
+        },
+      );
+
+      print('🔄 Iniciando upload...');
+      _currentUploadTask = ref.putData(imageBytes, metadata);
+
+      _uploadSubscription = _currentUploadTask!.snapshotEvents.listen(
+        (TaskSnapshot snapshot) {
+          double progress = snapshot.bytesTransferred / snapshot.totalBytes;
+          int progressPercent = (progress * 100).round();
+
+          print(
+              '📈 Progresso: $progressPercent% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)');
+          print('🔄 Estado: ${snapshot.state}');
+        },
+        onError: (error) {
+          print('❌ Erro no stream: $error');
+        },
+      );
+
+      print('⏳ Aguardando conclusão do upload...');
+      TaskSnapshot snapshot = await _currentUploadTask!.timeout(
+        const Duration(minutes: 10),
+        onTimeout: () {
+          print('⏰ Timeout após 10 minutos');
+          throw TimeoutException('Upload demorou mais que 10 minutos',
+              const Duration(minutes: 10));
+        },
+      );
+
+      print('📋 Estado final: ${snapshot.state}');
+      print('📊 Bytes transferidos: ${snapshot.bytesTransferred}');
+
+      if (snapshot.state == TaskState.success) {
+        print('🎉 Upload concluído com sucesso!');
+
+        print('🔗 Obtendo URL de download...');
+        String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
+          const Duration(minutes: 2),
+          onTimeout: () {
+            throw TimeoutException(
+                'Timeout ao obter URL', const Duration(minutes: 2));
+          },
+        );
+
+        print('✅ URL obtida: ${downloadUrl.substring(0, 100)}...');
+        return downloadUrl;
+      } else {
+        throw Exception('Upload falhou com estado: ${snapshot.state}');
+      }
+    } catch (e) {
+      print('💥 Erro detalhado no upload: $e');
+      print('📍 Tipo do erro: ${e.runtimeType}');
+
+      if (e is FirebaseException) {
+        print('🔥 Código do erro Firebase: ${e.code}');
+        print('🔥 Mensagem do erro Firebase: ${e.message}');
+      }
+
+      rethrow;
+    } finally {
+      print('🧹 Limpando recursos...');
+      _currentUploadTask = null;
+      _uploadSubscription?.cancel();
+      _uploadSubscription = null;
+    }
+  }
+
+  // BOTÕES DE TESTE
+  Widget _botaoTesteBasico() {
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+        ),
+        onPressed: () async {
+          print('🧪 Iniciando teste básico...');
+          bool resultado = await _testarConexaoFirebaseStorage();
+          print(resultado ? '✅ Teste básico OK!' : '❌ Teste básico falhou!');
+        },
+        child: const Text('🧪 Teste Básico'),
+      ),
+    );
+  }
+
+  Widget _botaoTesteDetalhado() {
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+        ),
+        onPressed: () async {
+          await _testeDetalhado();
+        },
+        child: const Text('🔬 Teste Detalhado'),
+      ),
+    );
+  }
+
+  Widget _botaoTesteAlternativo() {
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          foregroundColor: Colors.white,
+        ),
+        onPressed: () async {
+          await _testeStorageAlternativo();
+        },
+        child: const Text('🔄 Teste Alt'),
+      ),
+    );
+  }
+
+  void _mostrarSnackBar(String mensagem, Color cor) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensagem),
+        backgroundColor: cor,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Future<void> selecionarImagem() async {
     if (isUploadingImage) {
       _mostrarSnackBar('Aguarde o upload atual terminar', Colors.orange);
-      return;
-    }
-
-    if (!_driveService.isInitialized) {
-      _mostrarSnackBar(
-          'Serviço de imagens não disponível. Tente novamente em alguns segundos.',
-          Colors.orange);
-
-      // Tentar inicializar novamente
-      _initializeGoogleDriveInBackground();
       return;
     }
 
@@ -255,7 +861,6 @@ class _PerfilOngState extends State<PerfilOng> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 const Text(
                   'Foto de Perfil',
                   style: TextStyle(
@@ -265,8 +870,6 @@ class _PerfilOngState extends State<PerfilOng> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Opção Câmera (apenas se não for web)
                 if (!kIsWeb) ...[
                   _buildOpcaoImagem(
                     icone: Icons.camera_alt,
@@ -278,8 +881,6 @@ class _PerfilOngState extends State<PerfilOng> {
                     },
                   ),
                 ],
-
-                // Opção Galeria
                 _buildOpcaoImagem(
                   icone: Icons.photo_library,
                   titulo: kIsWeb ? 'Escolher Arquivo' : 'Escolher da Galeria',
@@ -291,8 +892,6 @@ class _PerfilOngState extends State<PerfilOng> {
                     _selecionarImagem(ImageSource.gallery);
                   },
                 ),
-
-                // Opção Remover (se houver imagem)
                 if (imagemUrl != null && imagemUrl!.isNotEmpty) ...[
                   const Divider(),
                   _buildOpcaoImagem(
@@ -306,7 +905,6 @@ class _PerfilOngState extends State<PerfilOng> {
                     },
                   ),
                 ],
-
                 const SizedBox(height: 10),
               ],
             ),
@@ -324,7 +922,6 @@ class _PerfilOngState extends State<PerfilOng> {
     Color? cor,
   }) {
     Color corFinal = cor ?? const Color.fromARGB(255, 1, 37, 54);
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -340,11 +937,7 @@ class _PerfilOngState extends State<PerfilOng> {
                 color: corFinal.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(25),
               ),
-              child: Icon(
-                icone,
-                color: corFinal,
-                size: 24,
-              ),
+              child: Icon(icone, color: corFinal, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -404,176 +997,25 @@ class _PerfilOngState extends State<PerfilOng> {
     }
   }
 
-  Future<void> _selecionarImagem(ImageSource source) async {
-    try {
-      print('Selecionando imagem da fonte: $source');
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        print('Imagem selecionada: ${image.path}');
-
-        // No web, usamos bytes ao invés de File
-        if (kIsWeb) {
-          final bytes = await image.readAsBytes();
-          await _processarImagemWeb(bytes, image.name);
-        } else {
-          await _processarImagem(File(image.path));
-        }
-      } else {
-        print('Nenhuma imagem foi selecionada');
-      }
-    } catch (e) {
-      print('Erro ao selecionar imagem: $e');
-      _mostrarSnackBar('Erro ao selecionar imagem: $e', Colors.red);
-    }
-  }
-
-  /// Processa imagem no web (usando bytes)
-  Future<void> _processarImagemWeb(List<int> bytes, String fileName) async {
-    if (!mounted) return;
-
-    setState(() {
-      isUploadingImage = true;
-    });
-
-    try {
-      String? uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) {
-        throw Exception('Usuário não autenticado');
-      }
-
-      // Validar tamanho da imagem (máximo 5MB)
-      if (bytes.length > 5 * 1024 * 1024) {
-        throw Exception('Imagem muito grande. Máximo 5MB permitido.');
-      }
-
-      print('Processando imagem web: ${bytes.length} bytes');
-
-      // Gerar nome único para o arquivo
-      String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      String nomeArquivo = 'perfil_${uid}_$timestamp.jpg';
-
-      print('Nome do arquivo: $nomeArquivo');
-
-      // Upload para Google Drive usando bytes
-      String? novaImagemUrl = await _driveService.uploadImageFromBytes(
-        imageBytes: Uint8List.fromList(bytes),
-        fileName: nomeArquivo,
-        description: 'Foto de perfil da ONG - UID: $uid',
-      );
-
-      print('Resultado do upload: $novaImagemUrl');
-
-      if (novaImagemUrl != null && novaImagemUrl.isNotEmpty) {
-        // Atualizar estado local
-        if (mounted) {
-          setState(() {
-            imagemUrl = novaImagemUrl;
-            imagemFoiAlterada = true;
-          });
-
-          _mostrarSnackBar(
-              'Foto carregada com sucesso! Clique em "Salvar Perfil" para confirmar.',
-              Colors.green);
-        }
-      } else {
-        throw Exception('Upload retornou URL vazia');
-      }
-    } catch (e) {
-      print('Erro ao processar imagem web: $e');
-      if (mounted) {
-        String mensagemErro = _tratarMensagemErro(e.toString());
-        _mostrarSnackBar('Erro ao processar imagem: $mensagemErro', Colors.red);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isUploadingImage = false;
-        });
+  Future<void> _removerImagemAnterior() async {
+    if (imagemUrlOriginal != null &&
+        imagemUrlOriginal!.isNotEmpty &&
+        imagemUrlOriginal!.contains('firebase')) {
+      try {
+        print('Removendo imagem anterior: $imagemUrlOriginal');
+        Reference ref = _storage.refFromURL(imagemUrlOriginal!);
+        await ref.delete();
+        print('Imagem anterior removida com sucesso');
+      } catch (e) {
+        print('Erro ao remover imagem anterior: $e');
       }
     }
   }
 
-  /// Processa imagem no mobile (usando File)
-  Future<void> _processarImagem(File imageFile) async {
-    if (!mounted) return;
-
-    setState(() {
-      isUploadingImage = true;
-    });
-
-    try {
-      String? uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) {
-        throw Exception('Usuário não autenticado');
-      }
-
-      // Validar se o arquivo existe
-      if (!await imageFile.exists()) {
-        throw Exception('Arquivo de imagem não encontrado');
-      }
-
-      // Validar tamanho da imagem (máximo 5MB)
-      int fileSize = await imageFile.length();
-      if (fileSize > 5 * 1024 * 1024) {
-        throw Exception('Imagem muito grande. Máximo 5MB permitido.');
-      }
-
-      print('Processando imagem mobile: $fileSize bytes');
-
-      // Gerar nome único para o arquivo
-      String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      String fileName = 'perfil_${uid}_$timestamp.jpg';
-
-      print('Nome do arquivo: $fileName');
-
-      // Upload para Google Drive
-      String? novaImagemUrl = await _driveService.uploadImage(
-        imageFile: imageFile,
-        fileName: fileName,
-        description: 'Foto de perfil da ONG - UID: $uid',
-      );
-
-      print('Resultado do upload: $novaImagemUrl');
-
-      if (novaImagemUrl != null && novaImagemUrl.isNotEmpty) {
-        // Atualizar estado local
-        if (mounted) {
-          setState(() {
-            imagemUrl = novaImagemUrl;
-            imagemFoiAlterada = true;
-          });
-
-          _mostrarSnackBar(
-              'Foto carregada com sucesso! Clique em "Salvar Perfil" para confirmar.',
-              Colors.green);
-        }
-      } else {
-        throw Exception('Upload retornou URL vazia');
-      }
-    } catch (e) {
-      print('Erro ao processar imagem: $e');
-      if (mounted) {
-        String mensagemErro = _tratarMensagemErro(e.toString());
-        _mostrarSnackBar('Erro ao processar imagem: $mensagemErro', Colors.red);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isUploadingImage = false;
-        });
-      }
-    }
-  }
-
-  /// Trata mensagens de erro para exibição ao usuário
   String _tratarMensagemErro(String erro) {
-    if (erro.contains('network') || erro.contains('connection')) {
+    if (erro.contains('TimeoutException') || erro.contains('timeout')) {
+      return 'Tempo limite excedido. Verifique sua conexão.';
+    } else if (erro.contains('network') || erro.contains('connection')) {
       return 'Erro de conexão. Verifique sua internet.';
     } else if (erro.contains('authentication') ||
         erro.contains('credentials')) {
@@ -582,34 +1024,22 @@ class _PerfilOngState extends State<PerfilOng> {
       return 'Sem permissão para acessar o serviço.';
     } else if (erro.contains('muito grande')) {
       return 'Imagem muito grande. Escolha uma imagem menor.';
+    } else if (erro.contains('storage/object-not-found')) {
+      return 'Arquivo não encontrado no servidor.';
+    } else if (erro.contains('storage/unauthorized')) {
+      return 'Sem autorização para acessar o armazenamento.';
+    } else if (erro.contains('storage/canceled') || erro.contains('canceled')) {
+      return 'Upload cancelado.';
+    } else if (erro.contains('storage/unknown')) {
+      return 'Erro desconhecido no servidor.';
     }
     return erro.length > 100 ? 'Erro no upload da imagem' : erro;
-  }
-
-  Future<void> _removerImagemAnterior() async {
-    if (imagemUrlOriginal != null &&
-        imagemUrlOriginal!.isNotEmpty &&
-        imagemUrlOriginal!.contains('drive.google.com')) {
-      try {
-        print('Removendo imagem anterior: $imagemUrlOriginal');
-        bool removido = await _driveService.deleteFileByUrl(imagemUrlOriginal!);
-        if (removido) {
-          print('Imagem anterior removida com sucesso');
-        } else {
-          print('Aviso: Não foi possível remover a imagem anterior');
-        }
-      } catch (e) {
-        print('Erro ao remover imagem anterior: $e');
-      }
-    }
   }
 
   Future<void> _removerImagem() async {
     if (!mounted) return;
 
-    setState(() {
-      isUploadingImage = true;
-    });
+    setState(() => isUploadingImage = true);
 
     try {
       if (mounted) {
@@ -617,10 +1047,10 @@ class _PerfilOngState extends State<PerfilOng> {
           imagemUrl = null;
           imagemFoiAlterada = true;
         });
-
         _mostrarSnackBar(
-            'Foto removida! Clique em "Salvar Perfil" para confirmar as alterações.',
-            Colors.green);
+          'Foto removida! Clique em "Salvar Perfil" para confirmar as alterações.',
+          Colors.green,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -628,43 +1058,23 @@ class _PerfilOngState extends State<PerfilOng> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          isUploadingImage = false;
-        });
+        setState(() => isUploadingImage = false);
       }
     }
-  }
-
-  void _mostrarSnackBar(String mensagem, Color cor) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensagem),
-        backgroundColor: cor,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
   }
 
   Future<void> salvarPerfil() async {
     if (!perfilKey.currentState!.validate()) return;
 
-    // Verifica se ainda está fazendo upload de imagem
     if (isUploadingImage) {
       _mostrarSnackBar('Aguarde o upload da imagem terminar', Colors.orange);
       return;
     }
 
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       String? uid = FirebaseAuth.instance.currentUser?.uid;
-
       if (uid != null) {
         Map<String, dynamic> dadosParaAtualizar = {
           'nome': nomeController.text.trim(),
@@ -680,14 +1090,11 @@ class _PerfilOngState extends State<PerfilOng> {
           'updated_at': Timestamp.now(),
         };
 
-        // Gerenciar imagem apenas se houve alteração
         if (imagemFoiAlterada) {
-          // Remover imagem anterior se existir e se a nova for diferente
           if (imagemUrlOriginal != imagemUrl) {
             await _removerImagemAnterior();
           }
 
-          // Atualizar URL da imagem
           dadosParaAtualizar['imagemUrl'] = imagemUrl;
           dadosParaAtualizar['imagemAtualizadaEm'] =
               FieldValue.serverTimestamp();
@@ -703,10 +1110,7 @@ class _PerfilOngState extends State<PerfilOng> {
 
         if (mounted) {
           _mostrarSnackBar('Perfil atualizado com sucesso!', Colors.green);
-
-          // Aguardar um pouco para mostrar a mensagem antes de voltar
           await Future.delayed(const Duration(milliseconds: 1500));
-
           if (mounted) {
             Navigator.pop(context);
           }
@@ -716,14 +1120,13 @@ class _PerfilOngState extends State<PerfilOng> {
       print('Erro ao salvar perfil: $e');
       if (mounted) {
         _mostrarSnackBar(
-            'Erro ao salvar perfil: ${_tratarMensagemErro(e.toString())}',
-            Colors.red);
+          'Erro ao salvar perfil: ${_tratarMensagemErro(e.toString())}',
+          Colors.red,
+        );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -825,7 +1228,16 @@ class _PerfilOngState extends State<PerfilOng> {
                       children: [
                         const SizedBox(height: 20),
 
-                        // Container principal
+                        // BOTÕES DE TESTE (TEMPORÁRIOS - REMOVA DEPOIS)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _botaoTesteBasico(),
+                            _botaoTesteDetalhado(),
+                            _botaoTesteAlternativo(),
+                          ],
+                        ),
+
                         Container(
                           width: larguraTela * 0.95,
                           padding: const EdgeInsets.all(20),
@@ -897,12 +1309,21 @@ class _PerfilOngState extends State<PerfilOng> {
                                                       child, loadingProgress) {
                                                     if (loadingProgress == null)
                                                       return child;
-                                                    return const Center(
+                                                    return Center(
                                                       child:
                                                           CircularProgressIndicator(
-                                                        color: Color.fromARGB(
+                                                        color: const Color
+                                                            .fromARGB(
                                                             255, 1, 37, 54),
                                                         strokeWidth: 2,
+                                                        value: loadingProgress
+                                                                    .expectedTotalBytes !=
+                                                                null
+                                                            ? loadingProgress
+                                                                    .cumulativeBytesLoaded /
+                                                                loadingProgress
+                                                                    .expectedTotalBytes!
+                                                            : null,
                                                       ),
                                                     );
                                                   },
@@ -910,11 +1331,27 @@ class _PerfilOngState extends State<PerfilOng> {
                                                       stackTrace) {
                                                     print(
                                                         'Erro ao carregar imagem: $error');
-                                                    return const Icon(
-                                                      Icons.camera_alt,
-                                                      size: 50,
-                                                      color: Color.fromARGB(
-                                                          255, 1, 37, 54),
+                                                    return const Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.error_outline,
+                                                          size: 30,
+                                                          color: Colors.red,
+                                                        ),
+                                                        SizedBox(height: 4),
+                                                        Text(
+                                                          'Erro ao\ncarregar',
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            color: Colors.red,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     );
                                                   },
                                                 )
@@ -931,15 +1368,11 @@ class _PerfilOngState extends State<PerfilOng> {
                                 Text(
                                   isUploadingImage
                                       ? 'Processando imagem...'
-                                      : _driveService.isInitialized
-                                          ? 'Toque para alterar a foto'
-                                          : 'Inicializando serviço de imagens...',
+                                      : 'Toque para alterar a foto',
                                   style: TextStyle(
                                     color: isUploadingImage
                                         ? Colors.orange
-                                        : _driveService.isInitialized
-                                            ? Colors.grey
-                                            : Colors.orange,
+                                        : Colors.grey,
                                     fontSize: 12,
                                     fontWeight: isUploadingImage
                                         ? FontWeight.w600
@@ -959,7 +1392,6 @@ class _PerfilOngState extends State<PerfilOng> {
                                           : null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: descricaoController,
                                   label: "Descrição da ONG:",
@@ -971,7 +1403,6 @@ class _PerfilOngState extends State<PerfilOng> {
                                           : null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: telefoneController,
                                   label: "Telefone:",
@@ -983,16 +1414,13 @@ class _PerfilOngState extends State<PerfilOng> {
                                           : null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: whatsappController,
                                   label: "WhatsApp:",
                                   icon: Icons.chat,
                                   tipoTeclado: TextInputType.phone,
-                                  validator: null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: enderecoController,
                                   label: "Endereço completo:",
@@ -1004,29 +1432,23 @@ class _PerfilOngState extends State<PerfilOng> {
                                           : null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: siteController,
                                   label: "Site (opcional):",
                                   icon: Icons.web,
                                   tipoTeclado: TextInputType.url,
-                                  validator: null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: instagramController,
                                   label: "Instagram (opcional):",
                                   icon: Icons.camera_alt,
-                                  validator: null,
                                 ),
                                 const SizedBox(height: 20),
-
                                 campoTexto(
                                   controller: facebookController,
                                   label: "Facebook (opcional):",
                                   icon: Icons.facebook,
-                                  validator: null,
                                 ),
                                 const SizedBox(height: 30),
 
@@ -1172,6 +1594,7 @@ class _PerfilOngState extends State<PerfilOng> {
                                             (isLoading || isUploadingImage)
                                                 ? null
                                                 : () {
+                                                    _cancelCurrentUpload();
                                                     Navigator.pop(context);
                                                   },
                                         child: const Text(
@@ -1191,13 +1614,13 @@ class _PerfilOngState extends State<PerfilOng> {
                     ),
                   ),
           ),
-
           // Botão voltar
           Positioned(
             top: 40,
             left: 16,
             child: IconButton(
               onPressed: () {
+                _cancelCurrentUpload();
                 Navigator.pop(context);
               },
               icon: const Icon(

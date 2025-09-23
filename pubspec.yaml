@@ -11,54 +11,37 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Ícones do Cupertino
   cupertino_icons: ^1.0.8
-  
-  # HTTP para requisições
   http: ^1.1.0
   
-  # Firebase Core (sempre necessário)
-  firebase_core: ^2.25.4
-  firebase_auth: ^4.17.4
-  cloud_firestore: ^4.8.3
-  firebase_database: ^10.1.1
+  # FIREBASE - Versões atualizadas e compatíveis
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.16.0
+  cloud_firestore: ^4.14.0
+  firebase_storage: ^11.6.0  # Atualizada
+  firebase_database: ^10.4.0  # Atualizada
+  connectivity_plus: ^5.0.2
   
-  # Formatação de datas
-  intl: ^0.18.0
+  # IMAGENS E PERMISSÕES - Versões atualizadas
+  image_picker: ^1.0.7
+  permission_handler: ^11.3.1  # Atualizada
   
-  # Seleção de arquivos (você já tinha)
+  # UTILITÁRIOS
+  intl: ^0.19.0  # Atualizada
+  path_provider: ^2.1.2
   file_picker: ^6.1.1
   
-  # NOVAS DEPENDÊNCIAS PARA GOOGLE DRIVE + IMAGENS
-  # Google APIs para Drive (versões mais estáveis)
+  # GOOGLE APIS (se você realmente precisar)
   googleapis: ^11.4.0
   googleapis_auth: ^1.4.1
-  
-  # Seleção de imagens da galeria/câmera
-  image_picker: ^1.0.7
-  
-  # Permissões do sistema
-  permission_handler: ^11.3.0
-  
-  # Acesso a diretórios do dispositivo
-  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^4.0.0  # Atualizada
 
 flutter:
   uses-material-design: true
 
   assets:
-    # Suas imagens existentes
-    - assets/images/Gusta.jpg
-    - assets/images/Edu.JPEG
-    - assets/images/Graca.jpg
-    - assets/images/fundo.jpg
-    - assets/images/logo.png
-    - assets/images/Lucco.jpg
-    
-    # NOVO: Credenciais do Google Drive
-    - assets/google_drive_credentials.json
+    - assets/images/
