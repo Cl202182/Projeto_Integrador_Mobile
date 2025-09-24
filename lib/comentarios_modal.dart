@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'image_service.dart';
 
 // Modal para comentários das ONGs
 class ComentariosModal extends StatefulWidget {
@@ -143,44 +144,38 @@ class _ComentariosModalState extends State<ComentariosModal> {
                 ),
                 child: data['autorImagemUrl'] != null &&
                         data['autorImagemUrl'].toString().isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          data['autorImagemUrl'],
+                    ? SmartImage(
+                        imageUrl: data['autorImagemUrl'],
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                        borderRadius: BorderRadius.circular(16),
+                        placeholder: Container(
                           width: 32,
                           height: 32,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                shape: BoxShape.circle,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: isUser
+                                    ? Colors.blue
+                                    : const Color.fromARGB(255, 1, 37, 54),
                               ),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: isUser
-                                        ? Colors.blue
-                                        : const Color.fromARGB(255, 1, 37, 54),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              isUser ? Icons.person : Icons.business,
-                              size: 16,
-                              color: isUser
-                                  ? Colors.blue
-                                  : const Color.fromARGB(255, 1, 37, 54),
-                            );
-                          },
+                            ),
+                          ),
+                        ),
+                        errorWidget: Icon(
+                          isUser ? Icons.person : Icons.business,
+                          size: 16,
+                          color: isUser
+                              ? Colors.blue
+                              : const Color.fromARGB(255, 1, 37, 54),
                         ),
                       )
                     : Icon(

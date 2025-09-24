@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'comentarios_modal.dart';
+import 'image_service.dart';
 
 class MinhasPostagensOng extends StatefulWidget {
   const MinhasPostagensOng({super.key});
@@ -22,6 +23,8 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
   @override
   void initState() {
     super.initState();
+    // Limpa cache de imagens ao inicializar (útil após login/logout)
+    ImageService().clearCache();
     _carregarNomeOng();
     _iniciarStreamMinhasPosts();
   }
@@ -340,36 +343,32 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                     backgroundColor: Colors.transparent,
                     child: data['ongImagemUrl'] != null &&
                             data['ongImagemUrl'].toString().isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(
-                              _getProxiedImageUrl(data['ongImagemUrl']),
+                        ? SmartImage(
+                            imageUrl: data['ongImagemUrl'],
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.circular(24),
+                            placeholder: Container(
                               width: 48,
                               height: 48,
-                              fit: BoxFit.cover,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  width: 48,
-                                  height: 48,
-                                  color: Colors.grey[200],
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
                                   ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(Icons.business,
-                                    color: Colors.white, size: 24);
-                              },
+                                ),
+                              ),
                             ),
+                            errorWidget: Icon(Icons.business,
+                                color: Colors.white, size: 24),
                           )
                         : Icon(Icons.business, color: Colors.white, size: 24),
                   ),
@@ -514,88 +513,86 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                       ),
                     ],
                   ),
-                  child: Image.network(
-                    _getProxiedImageUrl(data['imagemUrl']),
+                  child: SmartImage(
+                    imageUrl: data['imagemUrl'],
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        height: 250,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.grey[100]!, Colors.grey[50]!],
-                          ),
+                    borderRadius: BorderRadius.circular(16),
+                    placeholder: Container(
+                      height: 250,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.grey[100]!, Colors.grey[50]!],
                         ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                                child: CircularProgressIndicator(
-                                  color: const Color.fromARGB(255, 1, 37, 54),
-                                  strokeWidth: 3,
-                                ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                  ),
+                                ],
                               ),
-                              SizedBox(height: 12),
-                              Text(
-                                'Carregando imagem...',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: CircularProgressIndicator(
+                                color: const Color.fromARGB(255, 1, 37, 54),
+                                strokeWidth: 3,
                               ),
-                            ],
-                          ),
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              'Carregando imagem...',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.grey[100]!, Colors.grey[200]!],
-                          ),
+                      ),
+                    ),
+                    errorWidget: Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.grey[100]!, Colors.grey[200]!],
                         ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.broken_image,
-                                    size: 32, color: Colors.grey[400]),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
                               ),
-                              SizedBox(height: 12),
-                              Text(
-                                'Erro ao carregar imagem',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
+                              child: Icon(Icons.broken_image,
+                                  size: 32, color: Colors.grey[400]),
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              'Erro ao carregar imagem',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
               ),
