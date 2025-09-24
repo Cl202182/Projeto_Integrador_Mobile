@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_application_projeto_integrador/minhaspostagens.dart';
 import 'dart:async';
+
+import 'package:flutter_application_projeto_integrador/telaChat.dart';
 
 class HomeONG extends StatefulWidget {
   const HomeONG({super.key});
@@ -113,32 +117,40 @@ class _HomeONGState extends State<HomeONG> {
         return;
       }
 
-      print('Usuário autenticado: ${FirebaseAuth.instance.currentUser!.uid}');
+      String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+      print('Usuário autenticado: $currentUserId');
 
-      // Query mais simples para evitar problemas de índice
+      // Query para obter posts, excluindo posts do próprio usuário
       _postsSubscription = FirebaseFirestore.instance
           .collection('posts')
           .orderBy('created_at', descending: true)
-          .limit(20) // Reduzir limite inicial
+          .limit(20)
           .snapshots()
           .listen(
         (QuerySnapshot snapshot) {
           print('Snapshot recebido com ${snapshot.docs.length} documentos');
 
-          // Filtrar posts ativos no lado do cliente se necessário
-          List<DocumentSnapshot> postsAtivos = snapshot.docs.where((doc) {
+          // Filtrar posts ativos e que não sejam do usuário atual
+          List<DocumentSnapshot> postsOutrasOngs = snapshot.docs.where((doc) {
             Map<String, dynamic> data =
                 doc.data() as Map<String, dynamic>? ?? {};
-            return data['ativa'] != false; // Considera true se campo não existe
+
+            // Verifica se o post está ativo
+            bool isAtivo = data['ativa'] != false;
+
+            // Verifica se o post não é do usuário atual
+            bool naoEDoUsuarioAtual = data['ongId'] != currentUserId;
+
+            return isAtivo && naoEDoUsuarioAtual;
           }).toList();
 
           setState(() {
-            _posts = postsAtivos;
+            _posts = postsOutrasOngs;
             _isLoadingPosts = false;
             _errorMessage = null;
           });
 
-          print('Posts filtrados e carregados: ${_posts.length}');
+          print('Posts de outras ONGs carregados: ${_posts.length}');
         },
         onError: (error) {
           print('Erro detalhado no stream: $error');
@@ -172,6 +184,32 @@ class _HomeONGState extends State<HomeONG> {
 
   void _visualizarPerfil() {
     Navigator.pushNamed(context, '/visong');
+  }
+
+  // Função para navegar para o perfil de outra ONG
+  void _verPerfilOng(String ongId, String ongNome) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PerfilOngVisualizacao(
+          ongId: ongId,
+          ongNome: ongNome,
+        ),
+      ),
+    );
+  }
+
+  // Função para mostrar comentários
+  void _mostrarComentarios(String postId, String ongNome) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ComentariosModal(
+        postId: postId,
+        ongNome: ongNome,
+      ),
+    );
   }
 
   // SOLUÇÃO DEFINITIVA: PROXY PARA IMAGENS
@@ -226,6 +264,7 @@ class _HomeONGState extends State<HomeONG> {
         await FirebaseFirestore.instance.runTransaction((transaction) async {
           transaction.set(likeRef, {
             'ongId': uid,
+            'userType': 'ong', // Identificar que é uma ONG
             'created_at': FieldValue.serverTimestamp(),
           });
           transaction.update(postRef, {'likes': likesAtuais + 1});
@@ -262,85 +301,102 @@ class _HomeONGState extends State<HomeONG> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabeçalho do post com design moderno
+          // Cabeçalho do post com design moderno - MODIFICADO PARA SER CLICÁVEL
           Container(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Avatar com borda elegante
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color.fromARGB(255, 1, 37, 54),
-                        const Color.fromARGB(255, 1, 37, 54).withOpacity(0.8),
+                // Avatar com borda elegante - CLICÁVEL
+                GestureDetector(
+                  onTap: () => _verPerfilOng(
+                      data['ongId'] ?? '', data['ongNome'] ?? 'ONG'),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color.fromARGB(255, 1, 37, 54),
+                          const Color.fromARGB(255, 1, 37, 54).withOpacity(0.8),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color.fromARGB(255, 1, 37, 54)
+                              .withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color.fromARGB(255, 1, 37, 54)
-                            .withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.transparent,
-                    child: data['ongImagemUrl'] != null &&
-                            data['ongImagemUrl'].toString().isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(
-                              _getProxiedImageUrl(data['ongImagemUrl']),
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(Icons.business,
-                                    color: Colors.white, size: 24);
-                              },
-                            ),
-                          )
-                        : Icon(Icons.business, color: Colors.white, size: 24),
+                    child: CircleAvatar(
+                      radius: 24,
+                      backgroundColor: Colors.transparent,
+                      child: data['ongImagemUrl'] != null &&
+                              data['ongImagemUrl'].toString().isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                _getProxiedImageUrl(data['ongImagemUrl']),
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(Icons.business,
+                                      color: Colors.white, size: 24);
+                                },
+                              ),
+                            )
+                          : Icon(Icons.business, color: Colors.white, size: 24),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Info da ONG
+                // Info da ONG - CLICÁVEL
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['ongNome'] ?? 'ONG',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Color.fromARGB(255, 1, 37, 54),
-                          letterSpacing: -0.2,
+                  child: GestureDetector(
+                    onTap: () => _verPerfilOng(
+                        data['ongId'] ?? '', data['ongNome'] ?? 'ONG'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data['ongNome'] ?? 'ONG',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color.fromARGB(255, 1, 37, 54),
+                            letterSpacing: -0.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatarTempo(data['created_at']),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: Colors.grey[500],
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatarTempo(data['created_at']),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '• Toque para ver perfil',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Menu mais elegante
@@ -640,47 +696,52 @@ class _HomeONGState extends State<HomeONG> {
 
                     const SizedBox(width: 8),
 
-                    // Botão Comentar moderno
+                    // Botão Comentar moderno - FUNCIONAL
                     Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Comentários em breve!'),
-                              backgroundColor:
-                                  const Color.fromARGB(255, 1, 37, 54),
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('posts')
+                            .doc(post.id)
+                            .collection('comentarios')
+                            .snapshots(),
+                        builder: (context, comentariosSnapshot) {
+                          int totalComentarios = comentariosSnapshot.hasData
+                              ? comentariosSnapshot.data!.docs.length
+                              : 0;
+
+                          return InkWell(
+                            onTap: () => _mostrarComentarios(
+                                post.id, data['ongNome'] ?? 'ONG'),
+                            borderRadius: BorderRadius.circular(25),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                    color: Colors.grey[200]!, width: 1),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.comment_outlined,
+                                      color: Colors.grey[600], size: 20),
+                                  if (totalComentarios > 0) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '$totalComentarios',
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           );
                         },
-                        borderRadius: BorderRadius.circular(25),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(25),
-                            border:
-                                Border.all(color: Colors.grey[200]!, width: 1),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.comment_outlined,
-                                  color: Colors.grey[600], size: 20),
-                              if (data['comentarios'] != null &&
-                                  data['comentarios'] > 0) ...[
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${data['comentarios']}',
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                       ),
                     ),
 
@@ -805,7 +866,7 @@ class _HomeONGState extends State<HomeONG> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Nenhuma postagem encontrada',
+                'Nenhuma postagem de outras ONGs',
                 style: TextStyle(
                   color: Colors.grey,
                   fontSize: 18,
@@ -814,7 +875,7 @@ class _HomeONGState extends State<HomeONG> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Seja a primeira ONG a compartilhar algo!',
+                'Aguarde outras ONGs compartilharem conteúdo!',
                 style: TextStyle(
                   color: Colors.grey,
                   fontSize: 14,
@@ -924,11 +985,16 @@ class _HomeONGState extends State<HomeONG> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.chat),
-            tooltip: 'Chat',
+            icon: const Icon(Icons.my_library_books),
+            tooltip: 'Minhas Postagens',
             color: Colors.white,
             onPressed: () {
-              Navigator.pushNamed(context, '/contatoOng');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MinhasPostagensOng(),
+                ),
+              );
             },
           ),
           IconButton(
@@ -952,6 +1018,739 @@ class _HomeONGState extends State<HomeONG> {
         ),
         child: _buildFeedContent(),
       ),
+    );
+  }
+}
+
+// Modal para comentários das ONGs
+class ComentariosModal extends StatefulWidget {
+  final String postId;
+  final String ongNome;
+
+  const ComentariosModal({
+    super.key,
+    required this.postId,
+    required this.ongNome,
+  });
+
+  @override
+  State<ComentariosModal> createState() => _ComentariosModalState();
+}
+
+class _ComentariosModalState extends State<ComentariosModal> {
+  final TextEditingController _comentarioController = TextEditingController();
+  bool _enviandoComentario = false;
+
+  @override
+  void dispose() {
+    _comentarioController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enviarComentario() async {
+    if (_comentarioController.text.trim().isEmpty) return;
+
+    setState(() {
+      _enviandoComentario = true;
+    });
+
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      // Buscar dados da ONG
+      DocumentSnapshot ongDoc =
+          await FirebaseFirestore.instance.collection('ongs').doc(uid).get();
+
+      String ongName = 'ONG';
+      if (ongDoc.exists) {
+        Map<String, dynamic> ongData = ongDoc.data() as Map<String, dynamic>;
+        ongName = ongData['nome'] ?? 'ONG';
+      }
+
+      // Adicionar comentário
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(widget.postId)
+          .collection('comentarios')
+          .add({
+        'texto': _comentarioController.text.trim(),
+        'autorId': uid,
+        'autorNome': ongName,
+        'autorTipo': 'ong',
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      _comentarioController.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Comentário enviado!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao enviar comentário: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _enviandoComentario = false;
+      });
+    }
+  }
+
+  String _formatarTempoComentario(Timestamp? timestamp) {
+    if (timestamp == null) return 'Agora';
+
+    final now = DateTime.now();
+    final commentTime = timestamp.toDate();
+    final difference = now.difference(commentTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Agora';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}min';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d';
+    } else {
+      return '${commentTime.day}/${commentTime.month}/${commentTime.year}';
+    }
+  }
+
+  Widget _buildComentario(DocumentSnapshot comentario) {
+    Map<String, dynamic> data = comentario.data() as Map<String, dynamic>;
+    bool isUser = data['autorTipo'] == 'user';
+    bool isOng = data['autorTipo'] == 'ong';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: isUser
+                    ? Colors.blue.withOpacity(0.2)
+                    : const Color.fromARGB(255, 1, 37, 54).withOpacity(0.2),
+                child: Icon(
+                  isUser ? Icons.person : Icons.business,
+                  size: 16,
+                  color: isUser
+                      ? Colors.blue
+                      : const Color.fromARGB(255, 1, 37, 54),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data['autorNome'] ?? (isUser ? 'Usuário' : 'ONG'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: isUser
+                            ? Colors.blue
+                            : const Color.fromARGB(255, 1, 37, 54),
+                      ),
+                    ),
+                    Text(
+                      _formatarTempoComentario(data['created_at']),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            data['texto'] ?? '',
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Header do modal
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Comentários',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                  color: Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+
+          // Lista de comentários
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('posts')
+                  .doc(widget.postId)
+                  .collection('comentarios')
+                  .orderBy('created_at', descending: false)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: Color.fromARGB(255, 1, 37, 54),
+                    ),
+                  );
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.comment_outlined,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Nenhum comentário ainda',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Seja o primeiro a comentar!',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    return _buildComentario(snapshot.data!.docs[index]);
+                  },
+                );
+              },
+            ),
+          ),
+
+          // Campo de comentário
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.grey[200]!, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _comentarioController,
+                    maxLines: null,
+                    keyboardType: TextInputType.multiline,
+                    decoration: InputDecoration(
+                      hintText: 'Escreva um comentário...',
+                      hintStyle: TextStyle(color: Colors.grey[500]),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 1, 37, 54),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: _enviandoComentario
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.send, color: Colors.white),
+                    onPressed: _enviandoComentario ? null : _enviarComentario,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Nova classe para visualização do perfil de outras ONGs (SEM CHAT)
+class PerfilOngVisualizacao extends StatefulWidget {
+  final String ongId;
+  final String ongNome;
+
+  const PerfilOngVisualizacao({
+    super.key,
+    required this.ongId,
+    required this.ongNome,
+  });
+
+  @override
+  State<PerfilOngVisualizacao> createState() => _PerfilOngVisualizacaoState();
+}
+
+class _PerfilOngVisualizacaoState extends State<PerfilOngVisualizacao> {
+  Map<String, dynamic>? ongData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDadosOng();
+  }
+
+  Future<void> _carregarDadosOng() async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('ongs')
+          .doc(widget.ongId)
+          .get();
+
+      if (doc.exists) {
+        setState(() {
+          ongData = doc.data() as Map<String, dynamic>;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar dados: $e')),
+      );
+    }
+  }
+
+  // SOLUÇÃO DEFINITIVA: PROXY PARA IMAGENS
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
+  }
+
+  Widget _buildImagemPerfil() {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: const Color.fromARGB(255, 1, 37, 54),
+          width: 3,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(50),
+        child: (ongData?['imagemUrl'] != null &&
+                ongData!['imagemUrl'].toString().isNotEmpty)
+            ? Image.network(
+                _getProxiedImageUrl(ongData!['imagemUrl']),
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: const Color.fromARGB(255, 1, 37, 54),
+                      strokeWidth: 2,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.business,
+                    size: 40,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  );
+                },
+              )
+            : const Icon(
+                Icons.business,
+                size: 40,
+                color: Color.fromARGB(255, 1, 37, 54),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String title, String? content, IconData icon) {
+    if (content == null || content.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 1, 37, 54).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: const Color.fromARGB(255, 1, 37, 54),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color.fromARGB(255, 1, 37, 54),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAreasAtuacao() {
+    if (ongData?['areasAtuacao'] == null) return const SizedBox.shrink();
+
+    List<String> areas = List<String>.from(ongData!['areasAtuacao']);
+    if (areas.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        const Color.fromARGB(255, 1, 37, 54).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.category,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Áreas de Atuação',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: areas
+                  .map((area) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 1, 37, 54)
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color.fromARGB(255, 1, 37, 54)
+                                .withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          area,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color.fromARGB(255, 1, 37, 54),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text(
+          widget.ongNome,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 1, 37, 54),
+              ),
+            )
+          : ongData == null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 60,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Perfil não encontrado',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Header com foto e nome
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            _buildImagemPerfil(),
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.ongNome,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromARGB(255, 1, 37, 54),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (ongData?['email'] != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                ongData!['email'],
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Informações da ONG
+                      _buildInfoCard(
+                        'Descrição',
+                        ongData?['descricao'],
+                        Icons.description,
+                      ),
+
+                      _buildInfoCard(
+                        'Telefone',
+                        ongData?['telefone'],
+                        Icons.phone,
+                      ),
+
+                      _buildInfoCard(
+                        'WhatsApp',
+                        ongData?['whatsapp'],
+                        Icons.chat,
+                      ),
+
+                      _buildInfoCard(
+                        'Endereço',
+                        ongData?['endereco'],
+                        Icons.location_on,
+                      ),
+
+                      _buildInfoCard(
+                        'Site',
+                        ongData?['site'],
+                        Icons.web,
+                      ),
+
+                      _buildInfoCard(
+                        'Instagram',
+                        ongData?['instagram'] != null
+                            ? '@${ongData!['instagram'].replaceAll('@', '')}'
+                            : null,
+                        Icons.camera_alt,
+                      ),
+
+                      _buildInfoCard(
+                        'Facebook',
+                        ongData?['facebook'],
+                        Icons.facebook,
+                      ),
+
+                      // Áreas de atuação
+                      _buildAreasAtuacao(),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
     );
   }
 }
