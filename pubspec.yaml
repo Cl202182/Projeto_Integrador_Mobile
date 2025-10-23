@@ -20,7 +20,7 @@ dependencies:
   cloud_firestore: ^6.0.2
   firebase_storage: ^13.0.2  # Atualizada
   firebase_database: ^12.0.2  # Atualizada
-  connectivity_plus: ^7.0.0
+  connectivity_plus: ^6.0.3
   
   # IMAGENS E PERMISSÕES - Versões atualizadas
   image_picker: ^1.0.7

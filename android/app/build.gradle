@@ -1,23 +1,13 @@
 plugins {
     id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
+    id "org.jetbrains.kotlin.android"
     id "com.google.gms.google-services"
+    id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
     namespace = "com.example.flutter_application_projeto_integrador"
     compileSdk = 35
-    // ndkVersion = flutter.ndkVersion  // só descomente se realmente usar NDK
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
-    }
 
     defaultConfig {
         applicationId = "com.example.flutter_application_projeto_integrador"
@@ -26,9 +16,15 @@ android {
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled true
-        manifestPlaceholders = [
-            'applicationId': applicationId
-        ]
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
     }
 
     buildTypes {
@@ -71,11 +67,11 @@ dependencies {
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
 
-    // AndroidX Core
+    // AndroidX
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
 
-    // Rede/JSON
+    // HTTP/JSON
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
 
