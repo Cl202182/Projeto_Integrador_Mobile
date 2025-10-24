@@ -1,54 +1,49 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.flutter_application_projeto_integrador">
-
-    <!-- Permissões básicas comuns em apps Flutter -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28"/>
-
-    <application
-        android:name="${applicationName}"
-        android:label="flutter_application_projeto_integrador"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
-        android:networkSecurityConfig="@xml/network_security_config"
-        android:allowBackup="true"
-        android:supportsRtl="true">
-
-        <!-- Atividade principal -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:theme="@style/LaunchTheme"
-            android:launchMode="singleTop"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-
-        <!-- Permite integração com Firebase -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
-
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/ic_launcher_background" />
-
-        <!-- Requerido pelo Flutter -->
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
-
-    </application>
-
+<?xml version="1.0" encoding="utf-8"?>  
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"  
+    package="com.example.flutter_application_projeto_integrador">  
+  
+    <!-- Permissões básicas comuns em apps Flutter -->  
+    <uses-permission android:name="android.permission.INTERNET"/>  
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>  
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>  
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>  
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"  
+        android:maxSdkVersion="28"/>  
+  
+    <application  
+        android:name="${applicationName}"  
+        android:label="flutter_application_projeto_integrador"  
+        android:icon="@mipmap/ic_launcher"  
+        android:usesCleartextTraffic="true"  
+        android:allowBackup="true"  
+        android:supportsRtl="true">  
+  
+        <!-- Atividade principal -->  
+        <activity  
+            android:name=".MainActivity"  
+            android:exported="true"  
+            android:theme="@style/LaunchTheme"  
+            android:launchMode="singleTop"  
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"  
+            android:hardwareAccelerated="true"  
+            android:windowSoftInputMode="adjustResize">  
+  
+            <intent-filter>  
+                <action android:name="android.intent.action.MAIN"/>  
+                <category android:name="android.intent.category.LAUNCHER"/>  
+            </intent-filter>  
+        </activity>  
+  
+        <!-- Permite integração com Firebase -->  
+        <meta-data  
+            android:name="com.google.firebase.messaging.default_notification_icon"  
+            android:resource="@mipmap/ic_launcher" />  
+  
+        <!-- Requerido pelo Flutter -->  
+        <meta-data  
+            android:name="flutterEmbedding"  
+            android:value="2" />  
+  
+    </application>  
+  
 </manifest>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_projeto_integrador/TelaAtendimentos.dart';
@@ -21,25 +22,31 @@ import 'package:flutter_application_projeto_integrador/telaContatos.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyBnPQAWc1KPYnDqrwouvAgko21_Eqyk46I",
-      authDomain: "portal-ongs.firebaseapp.com",
-      databaseURL: "https://portal-ongs-default-rtdb.firebaseio.com",
-      projectId: "portal-ongs",
-      storageBucket: "portal-ongs.appspot.com",
-      messagingSenderId: "350051013789",
-      appId: "1:350051013789:web:a49ec9bd8b2af7e37f7074",
-      measurementId: "G-S979MLVQCW",
-    ),
-  );
+  // Inicializa Firebase apenas para Web (Android já inicializa automaticamente)
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyBnPQAWc1KPYnDqrwouvAgko21_Eqyk46I",
+        authDomain: "portal-ongs.firebaseapp.com",
+        databaseURL: "https://portal-ongs-default-rtdb.firebaseio.com",
+        projectId: "portal-ongs",
+        storageBucket: "portal-ongs.appspot.com",
+        messagingSenderId: "350051013789",
+        appId: "1:350051013789:web:a49ec9bd8b2af7e37f7074",
+        measurementId: "G-S979MLVQCW",
+      ),
+    );
+  } else {
+    // Para Android/iOS, inicializa sem options (usa google-services.json)
+    await Firebase.initializeApp();
+  }
 
   try {
     UserCredential userCredential =
         await FirebaseAuth.instance.signInAnonymously();
-    print(' Firebase conectado! UID anônimo: ${userCredential.user?.uid}');
+    print('✅ Firebase conectado! UID anônimo: ${userCredential.user?.uid}');
   } catch (e) {
-    print(' Erro ao conectar com Firebase: $e');
+    print('❌ Erro ao conectar com Firebase: $e');
   }
 
   runApp(const MyApp());
