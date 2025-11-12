@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 
 class Contato extends StatefulWidget {
   const Contato({super.key});
@@ -108,6 +109,7 @@ class _ContatoState extends State<Contato> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Conversas',
           style: TextStyle(
@@ -549,6 +551,10 @@ class _ContatoState extends State<Contato> {
           ),
         ],
       ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 1,
+        isOng: false,
+      ),
     );
   }
 
@@ -629,10 +635,6 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Container(
           height: 40,
           decoration: BoxDecoration(
@@ -1116,6 +1118,10 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
                   ),
           ),
         ],
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 1,
+        isOng: false,
       ),
     );
   }

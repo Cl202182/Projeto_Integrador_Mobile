@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 
 class VisualizarPerfilOng extends StatefulWidget {
   const VisualizarPerfilOng({super.key});
@@ -134,7 +135,6 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
               ),
             ),
           ),
-
           if (isLoading)
             const Center(
               child: CircularProgressIndicator(
@@ -195,6 +195,71 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
                               icon: const Icon(Icons.edit, color: Colors.white),
                               label: const Text(
                                 "Editar Perfil",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+
+                          // Botão Sair
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              onPressed: () async {
+                                // Mostrar diálogo de confirmação
+                                bool? confirmar = await showDialog<bool>(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('Sair da Conta'),
+                                      content: const Text(
+                                          'Tem certeza que deseja sair?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
+                                          child: const Text('Cancelar'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
+                                          child: const Text(
+                                            'Sair',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+
+                                if (confirmar == true) {
+                                  await FirebaseAuth.instance.signOut();
+                                  if (mounted) {
+                                    Navigator.pushNamedAndRemoveUntil(
+                                      context,
+                                      '/login',
+                                      (route) => false,
+                                    );
+                                  }
+                                }
+                              },
+                              icon:
+                                  const Icon(Icons.logout, color: Colors.white),
+                              label: const Text(
+                                "Sair da Conta",
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -402,23 +467,11 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
                 ),
               ),
             ),
-
-          // Botão voltar
-          Positioned(
-            top: 40,
-            left: 16,
-            child: IconButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: const Icon(
-                Icons.arrow_back,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-          ),
         ],
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 2,
+        isOng: true,
       ),
     );
   }

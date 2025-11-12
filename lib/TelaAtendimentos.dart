@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 
 class Atendimento extends StatefulWidget {
   const Atendimento({super.key});
@@ -96,6 +97,7 @@ class _AtendimentoState extends State<Atendimento> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Atendimentos',
           style: TextStyle(
@@ -449,6 +451,10 @@ class _AtendimentoState extends State<Atendimento> {
             ),
           ),
         ],
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 1,
+        isOng: true,
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 import 'dart:async';
 
 import 'package:flutter_application_projeto_integrador/telaChat.dart';
@@ -912,6 +913,7 @@ class _HomeUserState extends State<HomeUser> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: GestureDetector(
           onTap: _visualizarPerfil,
           child: Row(
@@ -960,22 +962,6 @@ class _HomeUserState extends State<HomeUser> {
         ),
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
         elevation: 2,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat),
-            tooltip: 'Ir para Chat',
-            color: Colors.white,
-            onPressed: () {
-              Navigator.pushNamed(context, '/contatoUser');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle),
-            tooltip: 'Ver Perfil',
-            color: Colors.white,
-            onPressed: _visualizarPerfil,
-          ),
-        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -989,6 +975,10 @@ class _HomeUserState extends State<HomeUser> {
           ),
         ),
         child: _buildFeedContent(),
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 0,
+        isOng: false,
       ),
     );
   }

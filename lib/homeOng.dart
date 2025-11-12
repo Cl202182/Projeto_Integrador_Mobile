@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 import 'package:flutter_application_projeto_integrador/minhaspostagens.dart';
 import 'dart:async';
 
@@ -927,6 +928,7 @@ class _HomeONGState extends State<HomeONG> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: GestureDetector(
           onTap: _visualizarPerfil,
           child: Row(
@@ -997,12 +999,6 @@ class _HomeONGState extends State<HomeONG> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle),
-            tooltip: 'Ver Perfil',
-            color: Colors.white,
-            onPressed: _visualizarPerfil,
-          ),
         ],
       ),
       body: Container(
@@ -1017,6 +1013,10 @@ class _HomeONGState extends State<HomeONG> {
           ),
         ),
         child: _buildFeedContent(),
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 0,
+        isOng: true,
       ),
     );
   }
