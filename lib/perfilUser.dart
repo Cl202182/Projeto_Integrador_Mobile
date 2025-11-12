@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+import 'dart:io';
+import 'dart:async';
 
 // Função para abrir a tela de chat com uma ONG
 void _abrirChatComOng(BuildContext context, String ongId, String ongNome) {
@@ -122,7 +129,7 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Avatar
+                          // Avatar com foto de perfil
                           Container(
                             width: 120,
                             height: 120,
@@ -133,10 +140,49 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
                                 width: 3,
                               ),
                             ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Color.fromARGB(255, 1, 37, 54),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(60),
+                              child: (dadosUsuario?['imagemUrl'] != null &&
+                                      dadosUsuario!['imagemUrl']
+                                          .toString()
+                                          .isNotEmpty)
+                                  ? Image.network(
+                                      dadosUsuario!['imagemUrl'],
+                                      fit: BoxFit.cover,
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                        if (loadingProgress == null)
+                                          return child;
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                            color: const Color.fromARGB(
+                                                255, 1, 37, 54),
+                                            strokeWidth: 2,
+                                            value: loadingProgress
+                                                        .expectedTotalBytes !=
+                                                    null
+                                                ? loadingProgress
+                                                        .cumulativeBytesLoaded /
+                                                    loadingProgress
+                                                        .expectedTotalBytes!
+                                                : null,
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return const Icon(
+                                          Icons.person,
+                                          size: 50,
+                                          color: Color.fromARGB(255, 1, 37, 54),
+                                        );
+                                      },
+                                    )
+                                  : const Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Color.fromARGB(255, 1, 37, 54),
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 30),
@@ -441,6 +487,21 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
   bool _isLoading = false;
   bool _isSaving = false;
 
+  // Variáveis para gerenciar imagem
+  String? imagemUrl;
+  String? imagemUrlOriginal;
+  bool isUploadingImage = false;
+  bool imagemFoiAlterada = false;
+
+  // Serviços
+  final ImagePicker _picker = ImagePicker();
+  final FirebaseStorage _storage = FirebaseStorage.instanceFor(
+      bucket: 'gs://portal-ongs.firebasestorage.app');
+
+  // Controle de upload
+  UploadTask? _currentUploadTask;
+  StreamSubscription<TaskSnapshot>? _uploadSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -458,10 +519,15 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
         TextEditingController(text: widget.dadosUsuario?['endereco'] ?? '');
     _cepController =
         TextEditingController(text: widget.dadosUsuario?['cep'] ?? '');
+
+    // Carregar imagem do usuário
+    imagemUrlOriginal = widget.dadosUsuario?['imagemUrl'];
+    imagemUrl = widget.dadosUsuario?['imagemUrl'];
   }
 
   @override
   void dispose() {
+    _cancelCurrentUpload();
     _nomeController.dispose();
     _cpfController.dispose();
     _emailController.dispose();
@@ -472,8 +538,467 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
     super.dispose();
   }
 
+  void _cancelCurrentUpload() {
+    _uploadSubscription?.cancel();
+    _currentUploadTask?.cancel();
+    _currentUploadTask = null;
+    _uploadSubscription = null;
+  }
+
+  // PROXY PARA IMAGENS (mesmo padrão da ONG)
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
+  }
+
+  Future<bool> _solicitarPermissoes() async {
+    if (kIsWeb) return true;
+
+    try {
+      if (Platform.isAndroid) {
+        Map<Permission, PermissionStatus> permissions = await [
+          Permission.camera,
+          Permission.storage,
+          Permission.photos,
+        ].request();
+        return permissions.values
+            .any((status) => status == PermissionStatus.granted);
+      } else if (Platform.isIOS) {
+        Map<Permission, PermissionStatus> permissions = await [
+          Permission.camera,
+          Permission.photos,
+        ].request();
+        return permissions.values
+            .any((status) => status == PermissionStatus.granted);
+      }
+      return true;
+    } catch (e) {
+      print('Erro ao solicitar permissões: $e');
+      return true;
+    }
+  }
+
+  Future<void> _selecionarImagem(ImageSource source) async {
+    try {
+      print('📱 Selecionando imagem da fonte: $source');
+      _cancelCurrentUpload();
+
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        print('📸 Imagem selecionada: ${image.name}');
+
+        final fileSize = await image.length();
+        print(
+            '📊 Tamanho do arquivo: ${(fileSize / 1024).toStringAsFixed(2)} KB');
+
+        if (fileSize > 5 * 1024 * 1024) {
+          print('❌ Imagem muito grande');
+          _mostrarSnackBar('Imagem muito grande. Máximo 5MB.', Colors.red);
+          return;
+        }
+
+        final bytes = await image.readAsBytes();
+        await _processarImagemComDiagnostico(bytes);
+      } else {
+        print('❌ Nenhuma imagem selecionada');
+      }
+    } catch (e) {
+      print('💥 Erro ao selecionar imagem: $e');
+      _mostrarSnackBar('Erro ao selecionar imagem', Colors.red);
+    }
+  }
+
+  Future<void> _processarImagemComDiagnostico(Uint8List imageBytes) async {
+    if (!mounted) return;
+
+    setState(() => isUploadingImage = true);
+
+    try {
+      print('🎯 Iniciando processamento da imagem...');
+
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      String? novaImagemUrl = await _uploadComDiagnostico(
+        imageBytes: imageBytes,
+        uid: uid,
+      ).timeout(
+        const Duration(minutes: 15),
+        onTimeout: () {
+          throw TimeoutException('Upload demorou muito para completar',
+              const Duration(minutes: 15));
+        },
+      );
+
+      if (novaImagemUrl != null && novaImagemUrl.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            imagemUrl = novaImagemUrl;
+            imagemFoiAlterada = true;
+          });
+
+          print('🎉 Imagem processada com sucesso!');
+          _mostrarSnackBar(
+              'Foto atualizada! Clique em "Salvar" para confirmar.',
+              Colors.green);
+        }
+      } else {
+        throw Exception('URL da imagem está vazia');
+      }
+    } catch (e) {
+      print('💥 Erro no processamento: $e');
+      _mostrarSnackBar('Erro ao processar imagem: $e', Colors.red);
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<String?> _uploadComDiagnostico({
+    required Uint8List imageBytes,
+    required String uid,
+  }) async {
+    try {
+      print('🚀 Iniciando upload com diagnóstico...');
+      print('📊 Tamanho da imagem: ${imageBytes.length} bytes');
+
+      if (imageBytes.length > 10 * 1024 * 1024) {
+        throw Exception(
+            'Imagem muito grande: ${(imageBytes.length / 1024 / 1024).toStringAsFixed(2)}MB');
+      }
+
+      _cancelCurrentUpload();
+
+      String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      String fileName = 'perfil_${uid}_$timestamp.jpg';
+
+      print('📁 Nome do arquivo: $fileName');
+
+      Reference ref = _storage.ref().child('users/perfil/$fileName');
+      print('📍 Caminho: ${ref.fullPath}');
+
+      SettableMetadata metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000',
+        customMetadata: {
+          'uploadedBy': uid,
+          'uploadTime': timestamp,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers':
+              'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+        },
+      );
+
+      print('🔄 Iniciando upload...');
+      _currentUploadTask = ref.putData(imageBytes, metadata);
+
+      _uploadSubscription = _currentUploadTask!.snapshotEvents.listen(
+        (TaskSnapshot snapshot) {
+          double progress = snapshot.bytesTransferred / snapshot.totalBytes;
+          int progressPercent = (progress * 100).round();
+
+          print(
+              '📈 Progresso: $progressPercent% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)');
+        },
+        onError: (error) {
+          print('❌ Erro no stream: $error');
+        },
+      );
+
+      print('⏳ Aguardando conclusão do upload...');
+      TaskSnapshot snapshot = await _currentUploadTask!.timeout(
+        const Duration(minutes: 10),
+        onTimeout: () {
+          print('⏰ Timeout após 10 minutos');
+          throw TimeoutException('Upload demorou mais que 10 minutos',
+              const Duration(minutes: 10));
+        },
+      );
+
+      print('📋 Estado final: ${snapshot.state}');
+      print('📊 Bytes transferidos: ${snapshot.bytesTransferred}');
+
+      if (snapshot.state == TaskState.success) {
+        print('🎉 Upload concluído com sucesso!');
+
+        print('🔗 Obtendo URL de download...');
+        String downloadUrl = await snapshot.ref.getDownloadURL().timeout(
+          const Duration(minutes: 2),
+          onTimeout: () {
+            throw TimeoutException(
+                'Timeout ao obter URL', const Duration(minutes: 2));
+          },
+        );
+
+        print('✅ URL obtida: ${downloadUrl.substring(0, 100)}...');
+        return downloadUrl;
+      } else {
+        throw Exception('Upload falhou com estado: ${snapshot.state}');
+      }
+    } catch (e) {
+      print('💥 Erro detalhado no upload: $e');
+      print('📍 Tipo do erro: ${e.runtimeType}');
+
+      if (e is FirebaseException) {
+        print('🔥 Código do erro Firebase: ${e.code}');
+        print('🔥 Mensagem do erro Firebase: ${e.message}');
+      }
+
+      rethrow;
+    } finally {
+      print('🧹 Limpando recursos...');
+      _currentUploadTask = null;
+      _uploadSubscription?.cancel();
+      _uploadSubscription = null;
+    }
+  }
+
+  Future<void> selecionarImagem() async {
+    if (isUploadingImage) {
+      _mostrarSnackBar('Aguarde o upload atual terminar', Colors.orange);
+      return;
+    }
+
+    final hasPermission = await _solicitarPermissoes();
+    if (!hasPermission) {
+      _mostrarSnackBar('Permissões necessárias não concedidas', Colors.red);
+      return;
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Foto de Perfil',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromARGB(255, 1, 37, 54),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (!kIsWeb) ...[
+                  _buildOpcaoImagem(
+                    icone: Icons.camera_alt,
+                    titulo: 'Tirar Foto',
+                    subtitulo: 'Usar câmera do dispositivo',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _selecionarImagem(ImageSource.camera);
+                    },
+                  ),
+                ],
+                _buildOpcaoImagem(
+                  icone: Icons.photo_library,
+                  titulo: kIsWeb ? 'Escolher Arquivo' : 'Escolher da Galeria',
+                  subtitulo: kIsWeb
+                      ? 'Selecionar arquivo do computador'
+                      : 'Selecionar foto existente',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selecionarImagem(ImageSource.gallery);
+                  },
+                ),
+                if (imagemUrl != null && imagemUrl!.isNotEmpty) ...[
+                  const Divider(),
+                  _buildOpcaoImagem(
+                    icone: Icons.delete_outline,
+                    titulo: 'Remover Foto',
+                    subtitulo: 'Excluir foto atual',
+                    cor: Colors.red,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _confirmarRemocaoImagem();
+                    },
+                  ),
+                ],
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOpcaoImagem({
+    required IconData icone,
+    required String titulo,
+    required String subtitulo,
+    required VoidCallback onTap,
+    Color? cor,
+  }) {
+    Color corFinal = cor ?? const Color.fromARGB(255, 1, 37, 54);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: corFinal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: Icon(icone, color: corFinal, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    titulo,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: corFinal,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitulo,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmarRemocaoImagem() async {
+    bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Remover Foto'),
+          content:
+              const Text('Tem certeza que deseja remover a foto de perfil?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Remover'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar == true) {
+      await _removerImagem();
+    }
+  }
+
+  Future<void> _removerImagemAnterior() async {
+    if (imagemUrlOriginal != null &&
+        imagemUrlOriginal!.isNotEmpty &&
+        imagemUrlOriginal!.contains('firebase')) {
+      try {
+        print('Removendo imagem anterior: $imagemUrlOriginal');
+        Reference ref = _storage.refFromURL(imagemUrlOriginal!);
+        await ref.delete();
+        print('Imagem anterior removida com sucesso');
+      } catch (e) {
+        print('Erro ao remover imagem anterior: $e');
+      }
+    }
+  }
+
+  Future<void> _removerImagem() async {
+    if (!mounted) return;
+
+    setState(() => isUploadingImage = true);
+
+    try {
+      if (mounted) {
+        setState(() {
+          imagemUrl = null;
+          imagemFoiAlterada = true;
+        });
+        _mostrarSnackBar(
+          'Foto removida! Clique em "Salvar" para confirmar as alterações.',
+          Colors.green,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _mostrarSnackBar('Erro ao remover imagem: $e', Colors.red);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
+  }
+
+  void _mostrarSnackBar(String mensagem, Color cor) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensagem),
+        backgroundColor: cor,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
   Future<void> _salvarAlteracoes() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (isUploadingImage) {
+      _mostrarSnackBar('Aguarde o upload da imagem terminar', Colors.orange);
+      return;
+    }
 
     setState(() {
       _isSaving = true;
@@ -482,7 +1007,7 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
     try {
       String? uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
-        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        Map<String, dynamic> dadosParaAtualizar = {
           'nome': _nomeController.text.trim(),
           'cpf': _cpfController.text.trim(),
           'telefone': _telefoneController.text.trim(),
@@ -490,17 +1015,35 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
           'endereco': _enderecoController.text.trim(),
           'cep': _cepController.text.trim(),
           'dataAtualizacao': FieldValue.serverTimestamp(),
-        });
+        };
+
+        // Se a imagem foi alterada, atualizar no Firestore
+        if (imagemFoiAlterada) {
+          if (imagemUrlOriginal != imagemUrl) {
+            await _removerImagemAnterior();
+          }
+
+          dadosParaAtualizar['imagemUrl'] = imagemUrl;
+          dadosParaAtualizar['imagemAtualizadaEm'] =
+              FieldValue.serverTimestamp();
+        }
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .update(dadosParaAtualizar);
 
         if (mounted) {
-          Navigator.pop(context, true); // Retorna true para indicar sucesso
+          _mostrarSnackBar('Perfil atualizado com sucesso!', Colors.green);
+          await Future.delayed(const Duration(milliseconds: 1500));
+          if (mounted) {
+            Navigator.pop(context, true); // Retorna true para indicar sucesso
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar alterações: $e')),
-        );
+        _mostrarSnackBar('Erro ao salvar alterações: $e', Colors.red);
       }
     } finally {
       if (mounted) {
@@ -546,6 +1089,92 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
         _dataNascimentoController.text = formattedDate;
       });
     }
+  }
+
+  // Widget de imagem de perfil (mesmo padrão da ONG)
+  Widget _buildImagemPerfil() {
+    return GestureDetector(
+      onTap: isUploadingImage ? null : selecionarImagem,
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: const Color.fromARGB(255, 1, 37, 54),
+            width: 3,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(60),
+          child: isUploadingImage
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        color: Color.fromARGB(255, 1, 37, 54),
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Enviando...',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color.fromARGB(255, 1, 37, 54),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : (imagemUrl != null && imagemUrl!.isNotEmpty)
+                  ? Image.network(
+                      _getProxiedImageUrl(imagemUrl!),
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: const Color.fromARGB(255, 1, 37, 54),
+                            strokeWidth: 2,
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Erro ao carregar imagem: $error');
+                        return const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 30,
+                              color: Colors.red,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Erro ao\ncarregar',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    )
+                  : const Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Color.fromARGB(255, 1, 37, 54),
+                    ),
+        ),
+      ),
+    );
   }
 
   Widget campoTexto({
@@ -618,6 +1247,25 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 20),
+
+                    // Foto de perfil
+                    Center(child: _buildImagemPerfil()),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Text(
+                        isUploadingImage
+                            ? 'Processando imagem...'
+                            : 'Toque para alterar a foto',
+                        style: TextStyle(
+                          color: isUploadingImage ? Colors.orange : Colors.grey,
+                          fontSize: 12,
+                          fontWeight: isUploadingImage
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
 
                     // Campo Nome
                     campoTexto(
