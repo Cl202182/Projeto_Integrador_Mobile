@@ -68,6 +68,14 @@ class _ComentariosModalState extends State<ComentariosModal> {
         'created_at': FieldValue.serverTimestamp(),
       });
 
+      // Incrementar contador de comentários na postagem principal
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(widget.postId)
+          .update({
+        'comentarios': FieldValue.increment(1),
+      });
+
       _comentarioController.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(

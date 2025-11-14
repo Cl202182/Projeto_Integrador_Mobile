@@ -31,8 +31,8 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
 
   // Imagens de perfil
-  String? userImageUrl;
   String? currentUserImageUrl;
+  String? userImageUrl;
   bool _imagesLoaded = false;
 
   @override
@@ -51,7 +51,10 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)!.settings.arguments as Map;
+    print('🔄 didChangeDependencies chamado');
+
+    final Map<String, dynamic> args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
     chatId = args['chatId'];
     userName = args['userName'];
     userId = args['userId'];
@@ -63,18 +66,18 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
     // Debug do usuário logado
     print('👤👤👤 USUÁRIO DEBUG 👤👤👤');
     print('👤 Current User ID: "$currentUserId"');
-    print('👤 Other User ID: "$userId"');
-    print('👤 ChatId recebido: "$chatId"');
-    print('👤 Platform: ${kIsWeb ? "WEB" : "MOBILE"}');
+    print('👤 Chat User ID: "$userId"');
+    print('👤 Chat User Name: "$userName"');
+    print('👤 Chat User Type: "$userType"');
     print('👤 Firebase User: ${FirebaseAuth.instance.currentUser?.uid}');
     print('👤 Is Anonymous: ${FirebaseAuth.instance.currentUser?.isAnonymous}');
     print('👤👤👤 FIM USUÁRIO DEBUG 👤👤👤');
 
-    // Carregar imagens de perfil apenas uma vez
-    if (!_imagesLoaded) {
-      _loadProfileImages();
-      _imagesLoaded = true;
-    }
+    // Carregar imagens de perfil sempre (para garantir que funcionem)
+    print('🔄 _imagesLoaded: $_imagesLoaded');
+    print('🔄 Forçando carregamento das imagens...');
+    _loadProfileImages();
+    _imagesLoaded = true;
   }
 
   Future<void> _loadProfileImages() async {
@@ -154,6 +157,7 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   Future<void> _loadOtherUserImage() async {
     try {
       String collection = userType == 'ong' ? 'ongs' : 'users';
+
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection(collection)
           .doc(userId)
@@ -161,9 +165,24 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
 
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+        print('🔥 CHAT DEBUG: userImageUrl = ${userData['imagemUrl']}');
+        print('🔥 CHAT DEBUG: userName = $userName');
+
         if (mounted) {
           setState(() {
             userImageUrl = userData['imagemUrl'];
+          });
+
+          // Forçar múltiplos rebuilds para garantir atualização
+          Future.delayed(Duration(milliseconds: 50), () {
+            if (mounted) setState(() {});
+          });
+          Future.delayed(Duration(milliseconds: 200), () {
+            if (mounted) setState(() {});
+          });
+          Future.delayed(Duration(milliseconds: 500), () {
+            if (mounted) setState(() {});
           });
         }
       }
@@ -181,9 +200,14 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
 
   // Função para proxy de imagens
   String _getProxiedImageUrl(String originalUrl) {
+    print('💬 Chat - Processando URL: $originalUrl');
     if (kIsWeb) {
-      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+      String proxiedUrl =
+          'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+      print('💬 Chat - URL com proxy: $proxiedUrl');
+      return proxiedUrl;
     }
+    print('💬 Chat - URL sem proxy: $originalUrl');
     return originalUrl;
   }
 
@@ -459,6 +483,13 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    print('🔥🔥🔥 BUILD CHAMADO 🔥🔥🔥');
+    print('🔥 BUILD: userImageUrl = $userImageUrl');
+    print('🔥 BUILD: userName = $userName');
+    print('🔥 BUILD: userImageUrl != null = ${userImageUrl != null}');
+    print(
+        '🔥 BUILD: userImageUrl!.isNotEmpty = ${userImageUrl != null ? userImageUrl!.isNotEmpty : false}');
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -476,52 +507,76 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
                   shape: BoxShape.circle,
                   color: Colors.white.withOpacity(0.2),
                 ),
-                child: ClipOval(
-                  child: SmartImage(
-                    imageUrl: userImageUrl != null && userImageUrl!.isNotEmpty
-                        ? _getProxiedImageUrl(userImageUrl!)
-                        : '',
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.cover,
-                    placeholder: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                child: userImageUrl != null && userImageUrl!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: SmartImage(
+                          imageUrl: _getProxiedImageUrl(userImageUrl!),
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                          placeholder: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Center(
+                              child: Text(
+                                userName.isNotEmpty
+                                    ? userName[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Center(
+                              child: Text(
+                                userName.isNotEmpty
+                                    ? userName[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Center(
+                          child: Text(
+                            userName.isNotEmpty
+                                ? userName[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    errorWidget: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -749,6 +804,8 @@ class PerfilVisualizacao extends StatefulWidget {
 class _PerfilVisualizacaoState extends State<PerfilVisualizacao> {
   Map<String, dynamic>? ongData;
   bool isLoading = true;
+  String? userImageUrl;
+  String userType = 'ong';
 
   @override
   void initState() {
@@ -764,8 +821,10 @@ class _PerfilVisualizacaoState extends State<PerfilVisualizacao> {
           .get();
 
       if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         setState(() {
-          ongData = doc.data() as Map<String, dynamic>;
+          ongData = data;
+          userImageUrl = data['imagemUrl'];
           isLoading = false;
         });
       } else {
@@ -781,6 +840,13 @@ class _PerfilVisualizacaoState extends State<PerfilVisualizacao> {
         SnackBar(content: Text('Erro ao carregar dados: $e')),
       );
     }
+  }
+
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   Future<void> _copiarParaClipboard(String texto, String tipo) async {
@@ -1101,12 +1167,66 @@ class _PerfilVisualizacaoState extends State<PerfilVisualizacao> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(
-          widget.ongName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            // Imagem de perfil da pessoa com quem está conversando
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: SmartImage(
+                  imageUrl: userImageUrl != null && userImageUrl!.isNotEmpty
+                      ? _getProxiedImageUrl(userImageUrl!)
+                      : '',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  placeholder: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      userType == 'ong' ? Icons.business : Icons.person,
+                      color: const Color.fromARGB(255, 1, 37, 54),
+                      size: 20,
+                    ),
+                  ),
+                  errorWidget: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      userType == 'ong' ? Icons.business : Icons.person,
+                      color: const Color.fromARGB(255, 1, 37, 54),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Nome da pessoa
+            Expanded(
+              child: Text(
+                widget.ongName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
         foregroundColor: Colors.white,
@@ -1371,6 +1491,8 @@ class PerfilUsuarioVisualizacao extends StatefulWidget {
 class _PerfilUsuarioVisualizacaoState extends State<PerfilUsuarioVisualizacao> {
   Map<String, dynamic>? userData;
   bool isLoading = true;
+  String? userImageUrl;
+  String userType = 'user';
 
   @override
   void initState() {
@@ -1403,6 +1525,13 @@ class _PerfilUsuarioVisualizacaoState extends State<PerfilUsuarioVisualizacao> {
         SnackBar(content: Text('Erro ao carregar dados: $e')),
       );
     }
+  }
+
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   Future<void> _copiarParaClipboard(String texto, String tipo) async {
@@ -1643,12 +1772,66 @@ class _PerfilUsuarioVisualizacaoState extends State<PerfilUsuarioVisualizacao> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(
-          widget.userName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            // Imagem de perfil da pessoa com quem está conversando
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: SmartImage(
+                  imageUrl: userImageUrl != null && userImageUrl!.isNotEmpty
+                      ? _getProxiedImageUrl(userImageUrl!)
+                      : '',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  placeholder: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      userType == 'user' ? Icons.person : Icons.business,
+                      color: const Color.fromARGB(255, 1, 37, 54),
+                      size: 20,
+                    ),
+                  ),
+                  errorWidget: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      userType == 'user' ? Icons.person : Icons.business,
+                      color: const Color.fromARGB(255, 1, 37, 54),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Nome da pessoa
+            Expanded(
+              child: Text(
+                widget.userName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
         foregroundColor: Colors.white,

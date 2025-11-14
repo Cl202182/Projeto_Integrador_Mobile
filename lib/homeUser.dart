@@ -11,6 +11,7 @@ import 'components/bottom_nav_bar.dart';
 import 'perfil_user_visualizacao.dart';
 import 'image_service.dart';
 import 'utils/chat_utils.dart';
+import 'comentarios_modal.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -419,24 +420,71 @@ class _HomeUserState extends State<HomeUser> {
                         ),
                       ],
                     ),
-                    child: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.transparent,
-                      child: data['ongImagemUrl'] != null &&
-                              data['ongImagemUrl'].toString().isNotEmpty
-                          ? ClipOval(
-                              child: Image.network(
-                                _getProxiedImageUrl(data['ongImagemUrl']),
+                    child: Builder(
+                      builder: (context) {
+                        print('🔥 FEED DEBUG COMPLETO:');
+                        print('🔥 TODOS OS CAMPOS: ${data.keys.toList()}');
+                        print('🔥 ongId: ${data['ongId']}');
+                        print('🔥 autorId: ${data['autorId']}');
+                        print('🔥 autorImagemUrl: ${data['autorImagemUrl']}');
+                        print('🔥 ongImagemUrl: ${data['ongImagemUrl']}');
+                        print('🔥 imagemUrl: ${data['imagemUrl']}');
+
+                        // Tentar todas as possibilidades de URL de imagem
+                        String? imageUrl;
+
+                        if (data['autorImagemUrl'] != null &&
+                            data['autorImagemUrl'].toString().isNotEmpty) {
+                          imageUrl = data['autorImagemUrl'];
+                          print('🔥 Avatar feed - usando autorImagemUrl');
+                        } else if (data['ongImagemUrl'] != null &&
+                            data['ongImagemUrl'].toString().isNotEmpty) {
+                          imageUrl = data['ongImagemUrl'];
+                          print('🔥 Avatar feed - usando ongImagemUrl');
+                        } else if (data['imagemUrl'] != null &&
+                            data['imagemUrl'].toString().isNotEmpty) {
+                          imageUrl = data['imagemUrl'];
+                          print('🔥 Avatar feed - usando imagemUrl');
+                        }
+
+                        if (imageUrl != null) {
+                          print('🔥 Avatar feed - URL final: $imageUrl');
+                          return CircleAvatar(
+                            radius: 24,
+                            backgroundColor: Colors.transparent,
+                            child: ClipOval(
+                              child: SmartImage(
+                                imageUrl: imageUrl,
                                 width: 48,
                                 height: 48,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(Icons.business,
-                                      color: Colors.white, size: 24);
-                                },
+                                errorWidget: Container(
+                                  width: 48,
+                                  height: 48,
+                                  color: const Color.fromARGB(255, 1, 37, 54),
+                                  child: const Icon(
+                                    Icons.business,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
                               ),
-                            )
-                          : Icon(Icons.business, color: Colors.white, size: 24),
+                            ),
+                          );
+                        }
+
+                        print(
+                            '🔥 Avatar feed - nenhuma URL encontrada, usando fallback');
+                        return CircleAvatar(
+                          radius: 24,
+                          backgroundColor: const Color.fromARGB(255, 1, 37, 54),
+                          child: const Icon(
+                            Icons.business,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1668,6 +1716,8 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
   bool isLoading = true;
   List<DocumentSnapshot> postagens = [];
   bool isLoadingPosts = true;
+  String? userImageUrl;
+  String userType = 'ong'; // Tipo padrão para esta tela
 
   @override
   void initState() {
@@ -1684,8 +1734,10 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
           .get();
 
       if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         setState(() {
-          ongData = doc.data() as Map<String, dynamic>;
+          ongData = data;
+          userImageUrl = data['imagemUrl']; // Carregar imagem da ONG
           isLoading = false;
         });
       } else {
@@ -1918,89 +1970,240 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
   Widget _buildPostagem(DocumentSnapshot post) {
     Map<String, dynamic> data = post.data() as Map<String, dynamic>;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () async {
+        // Abrir modal de comentários
+        await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => ComentariosModal(
+            postId: post.id,
+            ongNome: widget.ongNome,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Imagem da postagem
-          if (data['imagemUrl'] != null)
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              child: Image.network(
-                _getProxiedImageUrl(data['imagemUrl']),
-                width: double.infinity,
-                height: 200,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image_not_supported, size: 50),
-                  );
-                },
-              ),
+        );
+        // Recarregar postagens quando o modal for fechado
+        _carregarPostagens();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagem da postagem
+            if (data['imagemUrl'] != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                child: Image.network(
+                  _getProxiedImageUrl(data['imagemUrl']),
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 200,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_not_supported, size: 50),
+                    );
+                  },
+                ),
+              ),
 
-          // Conteúdo
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Texto
-                Text(
-                  data['texto'] ?? '',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                    height: 1.4,
+            // Conteúdo
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Texto
+                  Text(
+                    data['texto'] ?? '',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
-                // Estatísticas
-                Row(
-                  children: [
-                    Icon(Icons.favorite_border,
-                        size: 18, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${data['likes'] ?? 0}',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.comment_outlined,
-                        size: 18, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${data['comentarios'] ?? 0}',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                    ),
-                  ],
-                ),
-              ],
+                  // Dica visual de que é clicável
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.touch_app,
+                        size: 14,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Toque para ver mais e comentar',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Botões de ação
+                  Row(
+                    children: [
+                      // Botão de Like
+                      GestureDetector(
+                        onTap: () {
+                          _toggleLike(post.id, data);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: (data['likedBy'] ?? []).contains(
+                                    FirebaseAuth.instance.currentUser?.uid)
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                (data['likedBy'] ?? []).contains(
+                                        FirebaseAuth.instance.currentUser?.uid)
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 18,
+                                color: (data['likedBy'] ?? []).contains(
+                                        FirebaseAuth.instance.currentUser?.uid)
+                                    ? Colors.red
+                                    : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${data['likes'] ?? 0}',
+                                style: TextStyle(
+                                  color: (data['likedBy'] ?? []).contains(
+                                          FirebaseAuth
+                                              .instance.currentUser?.uid)
+                                      ? Colors.red
+                                      : Colors.grey[600],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Botão de Comentários
+                      GestureDetector(
+                        onTap: () async {
+                          await showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => ComentariosModal(
+                              postId: post.id,
+                              ongNome: widget.ongNome,
+                            ),
+                          );
+                          // Recarregar postagens quando o modal for fechado
+                          _carregarPostagens();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.comment_outlined,
+                                  size: 18, color: Colors.blue[600]),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${data['comentarios'] ?? 0}',
+                                style: TextStyle(
+                                  color: Colors.blue[600],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  // Função para dar like na postagem
+  Future<void> _toggleLike(String postId, Map<String, dynamic> postData) async {
+    try {
+      String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return;
+
+      DocumentReference postRef =
+          FirebaseFirestore.instance.collection('posts').doc(postId);
+
+      // Verificar se o usuário já deu like
+      List<dynamic> likes = postData['likedBy'] ?? [];
+      bool jaLikado = likes.contains(currentUserId);
+
+      if (jaLikado) {
+        // Remover like
+        await postRef.update({
+          'likes': FieldValue.increment(-1),
+          'likedBy': FieldValue.arrayRemove([currentUserId]),
+        });
+      } else {
+        // Adicionar like - garantir que os campos existam
+        Map<String, dynamic> updateData = {
+          'likedBy': FieldValue.arrayUnion([currentUserId]),
+        };
+
+        // Se o campo likes não existir, criar com valor 1, senão incrementar
+        if (postData['likes'] == null) {
+          updateData['likes'] = 1;
+        } else {
+          updateData['likes'] = FieldValue.increment(1);
+        }
+
+        await postRef.update(updateData);
+      }
+
+      // Recarregar postagens para atualizar UI
+      _carregarPostagens();
+    } catch (e) {
+      print('Erro ao dar like: $e');
+    }
   }
 
   Widget _buildAreasAtuacao() {

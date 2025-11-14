@@ -4,9 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_projeto_integrador/utils/chat_utils.dart';
 import 'components/bottom_nav_bar.dart';
 import 'image_service.dart';
+import 'utils/chat_utils.dart';
 
 class Contato extends StatefulWidget {
   const Contato({super.key});
@@ -28,6 +28,8 @@ class _ContatoState extends State<Contato> {
     _chatsRef = FirebaseDatabase.instance.ref().child('chats');
     _loadCurrentUserData();
   }
+
+  //a Sistema de notificações removido por completo
 
   // Função para proxy de imagens
   String _getProxiedImageUrl(String originalUrl) {

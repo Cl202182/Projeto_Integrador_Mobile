@@ -592,21 +592,6 @@ class _PerfilOngState extends State<PerfilOng> {
     }
   }
 
-  Future<void> _removerImagemAnterior() async {
-    if (imagemUrlOriginal != null &&
-        imagemUrlOriginal!.isNotEmpty &&
-        imagemUrlOriginal!.contains('firebase')) {
-      try {
-        print('Removendo imagem anterior: $imagemUrlOriginal');
-        Reference ref = _storage.refFromURL(imagemUrlOriginal!);
-        await ref.delete();
-        print('Imagem anterior removida com sucesso');
-      } catch (e) {
-        print('Erro ao remover imagem anterior: $e');
-      }
-    }
-  }
-
   String _tratarMensagemErro(String erro) {
     if (erro.contains('TimeoutException') || erro.contains('timeout')) {
       return 'Tempo limite excedido. Verifique sua conexão.';
@@ -687,7 +672,8 @@ class _PerfilOngState extends State<PerfilOng> {
 
         if (imagemFoiAlterada) {
           if (imagemUrlOriginal != imagemUrl) {
-            await _removerImagemAnterior();
+            // Mantemos a imagem antiga no Storage para não quebrar
+            // postagens que ainda referenciam a URL anterior.
           }
 
           dadosParaAtualizar['imagemUrl'] = imagemUrl;
