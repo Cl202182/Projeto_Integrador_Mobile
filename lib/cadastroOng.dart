@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'utils/validators.dart';
 
 class ong extends StatefulWidget {
   const ong({super.key});
@@ -126,9 +127,14 @@ class _ongState extends State<ong> {
                             controller: nome1,
                             label: "Nome:",
                             icon: Icons.badge,
-                            validator: (value) => value == null || value.isEmpty
-                                ? "O nome não pode estar vazio"
-                                : null,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return "Nome da ONG é obrigatório";
+                              } else if (value.trim().length < 3) {
+                                return "Nome deve ter pelo menos 3 caracteres";
+                              }
+                              return null;
+                            },
                           ),
 
                           const SizedBox(height: 30),
@@ -141,9 +147,8 @@ class _ongState extends State<ong> {
                             tipoTeclado: TextInputType.emailAddress,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return "O Email não deve ser vazio";
-                              } else if (!value.contains('@') ||
-                                  !value.contains('.')) {
+                                return "Email é obrigatório";
+                              } else if (!Validators.isValidEmail(value)) {
                                 return "Por favor, insira um email válido";
                               }
                               return null;
@@ -158,10 +163,22 @@ class _ongState extends State<ong> {
                             label: "CNPJ:",
                             icon: Icons.document_scanner,
                             tipoTeclado: TextInputType.number,
+                            hintText: '00.000.000/0000-00',
+                            onChanged: (value) {
+                              // Formatação automática do CNPJ
+                              String formatted = Validators.formatCNPJ(value);
+                              if (formatted != value) {
+                                cnpj1.value = cnpj1.value.copyWith(
+                                  text: formatted,
+                                  selection: TextSelection.collapsed(
+                                      offset: formatted.length),
+                                );
+                              }
+                            },
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return "O CNPJ não pode estar vazio";
-                              } else if (value.length < 14) {
+                                return "CNPJ é obrigatório";
+                              } else if (!Validators.isValidCNPJ(value)) {
                                 return "CNPJ inválido";
                               }
                               return null;
@@ -176,10 +193,9 @@ class _ongState extends State<ong> {
                             label: "Senha:",
                             icon: Icons.lock,
                             obscure: true,
-                            validator: (value) =>
-                                value == null || value.length < 6
-                                    ? "A senha deve ter pelo menos 6 caracteres"
-                                    : null,
+                            validator: (value) {
+                              return Validators.getPasswordError(value ?? '');
+                            },
                           ),
 
                           const SizedBox(height: 30),
@@ -189,9 +205,27 @@ class _ongState extends State<ong> {
                             controller: cep1,
                             label: "CEP:",
                             icon: Icons.location_on,
-                            validator: (value) => value == null || value.isEmpty
-                                ? "O CEP não pode estar vazio"
-                                : null,
+                            tipoTeclado: TextInputType.number,
+                            hintText: '00000-000',
+                            onChanged: (value) {
+                              // Formatação automática do CEP
+                              String formatted = Validators.formatCEP(value);
+                              if (formatted != value) {
+                                cep1.value = cep1.value.copyWith(
+                                  text: formatted,
+                                  selection: TextSelection.collapsed(
+                                      offset: formatted.length),
+                                );
+                              }
+                            },
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return "CEP é obrigatório";
+                              } else if (!Validators.isValidCEP(value)) {
+                                return "CEP inválido";
+                              }
+                              return null;
+                            },
                           ),
 
                           const SizedBox(height: 40),
@@ -288,11 +322,14 @@ class _ongState extends State<ong> {
     TextInputType tipoTeclado = TextInputType.text,
     bool obscure = false,
     required String? Function(String?) validator,
+    String? hintText,
+    void Function(String)? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: tipoTeclado,
       obscureText: obscure,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white),
@@ -302,6 +339,8 @@ class _ongState extends State<ong> {
         ),
         filled: true,
         fillColor: const Color.fromARGB(255, 1, 37, 54),
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Colors.white54),
       ),
       style: const TextStyle(color: Colors.white),
       validator: validator,

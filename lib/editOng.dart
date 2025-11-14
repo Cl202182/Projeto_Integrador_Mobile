@@ -200,6 +200,38 @@ class _PerfilOngState extends State<PerfilOng> {
       print('📱 Selecionando imagem da fonte: $source');
       _cancelCurrentUpload();
 
+      // Solicitar permissões antes de tentar acessar câmera/galeria
+      PermissionStatus permission;
+      if (source == ImageSource.camera) {
+        permission = await Permission.camera.request();
+        if (permission != PermissionStatus.granted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permissão de câmera necessária')),
+          );
+          return;
+        }
+      } else {
+        // Para galeria, verificar permissões
+        PermissionStatus photosStatus = await Permission.photos.status;
+        PermissionStatus storageStatus = await Permission.storage.status;
+
+        if (photosStatus != PermissionStatus.granted &&
+            storageStatus != PermissionStatus.granted) {
+          Map<Permission, PermissionStatus> permissions = await [
+            Permission.photos,
+            Permission.storage,
+          ].request();
+
+          if (permissions[Permission.photos] != PermissionStatus.granted &&
+              permissions[Permission.storage] != PermissionStatus.granted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Permissão de galeria necessária')),
+            );
+            return;
+          }
+        }
+      }
+
       final XFile? image = await _picker.pickImage(
         source: source,
         maxWidth: 1024,
@@ -889,7 +921,7 @@ class _PerfilOngState extends State<PerfilOng> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 const Text(
-                                  'PERFIL DA ONG',
+                                  'MEU PERFIL',
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,

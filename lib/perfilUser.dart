@@ -565,6 +565,34 @@ class _EditarPerfilUsuarioState extends State<EditarPerfilUsuario> {
       print('📱 Selecionando imagem da fonte: $source');
       _cancelCurrentUpload();
 
+      // Solicitar permissões antes de tentar acessar câmera/galeria
+      PermissionStatus permission;
+      if (source == ImageSource.camera) {
+        permission = await Permission.camera.request();
+        if (permission != PermissionStatus.granted) {
+          _mostrarSnackBar('Permissão de câmera necessária', Colors.red);
+          return;
+        }
+      } else {
+        // Para galeria, verificar permissões
+        PermissionStatus photosStatus = await Permission.photos.status;
+        PermissionStatus storageStatus = await Permission.storage.status;
+
+        if (photosStatus != PermissionStatus.granted &&
+            storageStatus != PermissionStatus.granted) {
+          Map<Permission, PermissionStatus> permissions = await [
+            Permission.photos,
+            Permission.storage,
+          ].request();
+
+          if (permissions[Permission.photos] != PermissionStatus.granted &&
+              permissions[Permission.storage] != PermissionStatus.granted) {
+            _mostrarSnackBar('Permissão de galeria necessária', Colors.red);
+            return;
+          }
+        }
+      }
+
       final XFile? image = await _picker.pickImage(
         source: source,
         maxWidth: 1024,

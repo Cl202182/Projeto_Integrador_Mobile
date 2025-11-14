@@ -10,7 +10,7 @@ import 'package:flutter_application_projeto_integrador/telaChat.dart';
 import 'components/bottom_nav_bar.dart';
 import 'perfil_user_visualizacao.dart';
 import 'image_service.dart';
-import '/chat_utils.dart';
+import 'utils/chat_utils.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'utils/validators.dart';
 
 class cliente extends StatefulWidget {
   const cliente({super.key});
@@ -153,7 +154,12 @@ class _clienteState extends State<cliente> {
                           style: const TextStyle(color: Colors.white),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return "O nome não pode estar vazio";
+                              return "Nome é obrigatório";
+                            } else if (value.trim().length < 2) {
+                              return "Nome deve ter pelo menos 2 caracteres";
+                            } else if (!RegExp(r'^[a-zA-ZÀ-ÿ\s]+$')
+                                .hasMatch(value)) {
+                              return "Nome deve conter apenas letras";
                             }
                             return null;
                           },
@@ -175,10 +181,9 @@ class _clienteState extends State<cliente> {
                           style: const TextStyle(color: Colors.white),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return "O Email não deve ser vazio";
-                            } else if (!value.contains('@') ||
-                                !value.contains('.')) {
-                              return "Por favor, insira um endereço de email válido";
+                              return "O Email é obrigatório";
+                            } else if (!Validators.isValidEmail(value)) {
+                              return "Por favor, insira um email válido";
                             }
                             return null;
                           },
@@ -199,12 +204,7 @@ class _clienteState extends State<cliente> {
                           ),
                           style: const TextStyle(color: Colors.white),
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Por favor, insira sua senha';
-                            } else if (value.length < 6) {
-                              return "A senha deve ter pelo menos 6 caracteres";
-                            }
-                            return null;
+                            return Validators.getPasswordError(value ?? '');
                           },
                         ),
                         const SizedBox(height: 30),
@@ -220,13 +220,27 @@ class _clienteState extends State<cliente> {
                             ),
                             filled: true,
                             fillColor: const Color.fromARGB(255, 1, 37, 54),
+                            hintText: '000.000.000-00',
+                            hintStyle: const TextStyle(color: Colors.white54),
                           ),
                           style: const TextStyle(color: Colors.white),
+                          onChanged: (value) {
+                            // Formatação automática do CPF
+                            String formatted = Validators.formatCPF(value);
+                            if (formatted != value) {
+                              cpfController.value =
+                                  cpfController.value.copyWith(
+                                text: formatted,
+                                selection: TextSelection.collapsed(
+                                    offset: formatted.length),
+                              );
+                            }
+                          },
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Por favor, insira seu CPF';
-                            } else if (value.length != 11) {
-                              return 'O CPF deve ter 11 dígitos';
+                              return 'CPF é obrigatório';
+                            } else if (!Validators.isValidCPF(value)) {
+                              return 'CPF inválido';
                             }
                             return null;
                           },
