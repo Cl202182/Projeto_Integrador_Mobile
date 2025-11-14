@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '/chat_utils.dart';
 
 class PerfilUserVisualizacaoOng extends StatefulWidget {
   final String userId;
@@ -101,7 +102,7 @@ class _PerfilUserVisualizacaoOngState extends State<PerfilUserVisualizacaoOng> {
     }
 
     try {
-      String chatId = _generateChatId(currentOngId!, widget.userId);
+      String chatId = ChatUtils.generateChatId(currentOngId!, widget.userId);
 
       Navigator.pushNamed(
         context,
@@ -122,10 +123,6 @@ class _PerfilUserVisualizacaoOngState extends State<PerfilUserVisualizacaoOng> {
         ),
       );
     }
-  }
-
-  String _generateChatId(String id1, String id2) {
-    return (id1.hashCode <= id2.hashCode) ? '${id1}_$id2' : '${id2}_$id1';
   }
 
   @override

@@ -2,7 +2,8 @@
   "project_info": {
     "project_number": "350051013789",
     "project_id": "portal-ongs",
-    "storage_bucket": "portal-ongs.firebasestorage.app"
+    "storage_bucket": "portal-ongs.firebasestorage.app",
+    "firebase_url": "https://portal-ongs-default-rtdb.firebaseio.com"
   },
   "client": [
     {

@@ -10,6 +10,7 @@ import 'package:flutter_application_projeto_integrador/telaChat.dart';
 import 'components/bottom_nav_bar.dart';
 import 'perfil_user_visualizacao.dart';
 import 'image_service.dart';
+import '/chat_utils.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -1751,10 +1752,8 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
         currentUserNome = currentData['nome'] ?? 'Usuário';
       }
 
-      // Criar ou buscar chatId existente
-      List<String> participants = [currentUserId, widget.ongId];
-      participants.sort(); // Para manter consistência
-      String chatId = participants.join('_');
+      // Criar ou buscar chatId existente usando função padronizada
+      String chatId = ChatUtils.generateChatId(currentUserId, widget.ongId);
 
       // Verificar se o chat já existe no Firebase Realtime Database
       DatabaseReference chatRef =
@@ -1764,7 +1763,7 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
       if (!snapshot.snapshot.exists) {
         // Criar novo chat
         await chatRef.set({
-          'participants': participants,
+          'participants': [currentUserId, widget.ongId],
           'createdAt': ServerValue.timestamp,
           'lastMessage': '',
           'lastMessageTime': ServerValue.timestamp,

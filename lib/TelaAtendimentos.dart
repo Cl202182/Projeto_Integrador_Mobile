@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_application_projeto_integrador/chat_utils.dart';
 import 'components/bottom_nav_bar.dart';
 import 'image_service.dart';
 
@@ -18,6 +19,7 @@ class _AtendimentoState extends State<Atendimento> {
   final String currentOngId = FirebaseAuth.instance.currentUser!.uid;
   String? currentOngName;
   String? currentOngEmail;
+  String? ongImageUrl;
   late DatabaseReference _chatsRef;
 
   @override
@@ -48,6 +50,7 @@ class _AtendimentoState extends State<Atendimento> {
         setState(() {
           currentOngName = ongData['nome'] ?? ongData['name'] ?? 'ONG';
           currentOngEmail = ongData['email'] ?? '';
+          ongImageUrl = ongData['imagemUrl'];
         });
       } else {
         // Se não encontrar em 'ongs', tenta em 'users'
@@ -61,6 +64,7 @@ class _AtendimentoState extends State<Atendimento> {
           setState(() {
             currentOngName = userData['nome'] ?? userData['name'] ?? 'ONG';
             currentOngEmail = userData['email'] ?? '';
+            ongImageUrl = userData['imagemUrl'];
           });
         }
       }
@@ -341,8 +345,8 @@ class _AtendimentoState extends State<Atendimento> {
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
                               onTap: () {
-                                String chatId =
-                                    generateChatId(currentOngId, userId);
+                                String chatId = ChatUtils.generateChatId(
+                                    currentOngId, userId);
 
                                 Navigator.pushNamed(
                                   context,
@@ -530,12 +534,9 @@ class _AtendimentoState extends State<Atendimento> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 1,
         isOng: true,
+        profileImageUrl: ongImageUrl,
       ),
     );
-  }
-
-  String generateChatId(String id1, String id2) {
-    return (id1.hashCode <= id2.hashCode) ? '${id1}_$id2' : '${id2}_$id1';
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_application_projeto_integrador/chat_utils.dart';
 import 'components/bottom_nav_bar.dart';
 import 'image_service.dart';
 
@@ -18,6 +19,7 @@ class _ContatoState extends State<Contato> {
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
   String? currentUserName;
   String? currentUserEmail;
+  String? userImageUrl;
   late DatabaseReference _chatsRef;
 
   @override
@@ -48,6 +50,7 @@ class _ContatoState extends State<Contato> {
         setState(() {
           currentUserName = userData['nome'] ?? userData['name'] ?? 'Usuário';
           currentUserEmail = userData['email'] ?? '';
+          userImageUrl = userData['imagemUrl'];
         });
       } else {
         // Se não encontrar em 'users', tenta em 'ongs'
@@ -61,6 +64,7 @@ class _ContatoState extends State<Contato> {
           setState(() {
             currentUserName = ongData['nome'] ?? ongData['name'] ?? 'Usuário';
             currentUserEmail = ongData['email'] ?? '';
+            userImageUrl = ongData['imagemUrl'];
           });
         }
       }
@@ -408,8 +412,14 @@ class _ContatoState extends State<Contato> {
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
                               onTap: () {
-                                String chatId =
-                                    generateChatId(currentUserId, ongId);
+                                print('🚀 GERANDO CHATID NO CONTATOS');
+                                print('🚀 currentUserId: "$currentUserId"');
+                                print('🚀 ongId: "$ongId"');
+
+                                String chatId = ChatUtils.generateChatId(
+                                    currentUserId, ongId);
+
+                                print('🚀 ChatId gerado: "$chatId"');
 
                                 Navigator.pushNamed(
                                   context,
@@ -631,12 +641,9 @@ class _ContatoState extends State<Contato> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 1,
         isOng: false,
+        profileImageUrl: userImageUrl,
       ),
     );
-  }
-
-  String generateChatId(String id1, String id2) {
-    return (id1.hashCode <= id2.hashCode) ? '${id1}_$id2' : '${id2}_$id1';
   }
 
   @override
@@ -665,6 +672,7 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
   String _searchQuery = '';
   List<String> _selectedFilters = [];
   bool _showFilters = false;
+  String? userImageUrl;
 
   // Áreas de atuação disponíveis (mesmas do PerfilOng)
   final List<String> areasDisponiveis = [
@@ -679,6 +687,30 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
     'Idosos',
     'Crianças e Adolescentes',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserImage();
+  }
+
+  Future<void> _loadUserImage() async {
+    try {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUserId)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        setState(() {
+          userImageUrl = userData['imagemUrl'];
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar imagem do usuário: $e');
+    }
+  }
 
   // Função para proxy de imagens
   String _getProxiedImageUrl(String originalUrl) {
@@ -1039,7 +1071,7 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
                                 onTap: () {
-                                  String chatId = _generateChatId(
+                                  String chatId = ChatUtils.generateChatId(
                                       widget.currentUserId, ongId);
 
                                   Navigator.pop(
@@ -1289,12 +1321,9 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 1,
         isOng: false,
+        profileImageUrl: userImageUrl,
       ),
     );
-  }
-
-  String _generateChatId(String id1, String id2) {
-    return (id1.hashCode <= id2.hashCode) ? '${id1}_$id2' : '${id2}_$id1';
   }
 
   @override

@@ -1,12 +1,13 @@
 //pg alterada
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
+import 'components/bottom_nav_bar.dart';
+import 'image_service.dart';
 import 'minhaspostagens.dart';
 
 class VisualizarPerfilOng extends StatefulWidget {
@@ -18,6 +19,7 @@ class VisualizarPerfilOng extends StatefulWidget {
 
 class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
   Map<String, dynamic>? dadosOng;
+  String? ongImageUrl;
   bool isLoading = true;
 
   @override
@@ -43,8 +45,10 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
             await FirebaseFirestore.instance.collection('ongs').doc(uid).get();
 
         if (doc.exists) {
+          Map<String, dynamic> dados = doc.data() as Map<String, dynamic>;
           setState(() {
-            dadosOng = doc.data() as Map<String, dynamic>;
+            dadosOng = dados;
+            ongImageUrl = dados['imagemUrl'];
             isLoading = false;
           });
         }
@@ -75,44 +79,10 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
         borderRadius: BorderRadius.circular(60),
         child: (dadosOng?['imagemUrl'] != null &&
                 dadosOng!['imagemUrl'].toString().isNotEmpty)
-            ? Image.network(
-                _getProxiedImageUrl(dadosOng!['imagemUrl']),
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      color: const Color.fromARGB(255, 1, 37, 54),
-                      strokeWidth: 2,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  print('Erro ao carregar imagem: $error');
-                  return const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 30,
-                        color: Colors.red,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Erro ao\ncarregar',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+            ? SmartImage(
+                imageUrl: dadosOng!['imagemUrl'],
+                width: 120,
+                height: 120,
               )
             : const Icon(
                 Icons.business,
@@ -516,6 +486,7 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 2,
         isOng: true,
+        profileImageUrl: ongImageUrl,
       ),
     );
   }

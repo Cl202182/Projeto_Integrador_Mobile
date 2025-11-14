@@ -42,13 +42,8 @@ void main() async {
     await Firebase.initializeApp();
   }
 
-  try {
-    UserCredential userCredential =
-        await FirebaseAuth.instance.signInAnonymously();
-    print('✅ Firebase conectado! UID anônimo: ${userCredential.user?.uid}');
-  } catch (e) {
-    print('❌ Erro ao conectar com Firebase: $e');
-  }
+  // Não fazer login anônimo automático - deixar o usuário fazer login real
+  print('✅ Firebase inicializado! Aguardando login do usuário...');
 
   runApp(const MyApp());
 }

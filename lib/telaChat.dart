@@ -33,6 +33,7 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   // Imagens de perfil
   String? userImageUrl;
   String? currentUserImageUrl;
+  bool _imagesLoaded = false;
 
   @override
   void initState() {
@@ -59,13 +60,61 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
     _messagesRef =
         FirebaseDatabase.instance.ref().child('chats/$chatId/messages');
 
-    // Carregar imagens de perfil
-    _loadProfileImages();
+    // Debug do usuário logado
+    print('👤👤👤 USUÁRIO DEBUG 👤👤👤');
+    print('👤 Current User ID: "$currentUserId"');
+    print('👤 Other User ID: "$userId"');
+    print('👤 ChatId recebido: "$chatId"');
+    print('👤 Platform: ${kIsWeb ? "WEB" : "MOBILE"}');
+    print('👤 Firebase User: ${FirebaseAuth.instance.currentUser?.uid}');
+    print('👤 Is Anonymous: ${FirebaseAuth.instance.currentUser?.isAnonymous}');
+    print('👤👤👤 FIM USUÁRIO DEBUG 👤👤👤');
+
+    // Carregar imagens de perfil apenas uma vez
+    if (!_imagesLoaded) {
+      _loadProfileImages();
+      _imagesLoaded = true;
+    }
   }
 
   Future<void> _loadProfileImages() async {
     try {
-      // Carregar imagem do usuário atual - verificar se é ONG ou usuário
+      print('🔄 Iniciando carregamento das imagens de perfil...');
+
+      // Carregar ambas as imagens em paralelo para melhor performance
+      List<Future> futures = [];
+
+      // Future para carregar imagem do usuário atual
+      futures.add(_loadCurrentUserImage());
+
+      // Future para carregar imagem do outro usuário
+      futures.add(_loadOtherUserImage());
+
+      // Aguardar ambas as operações
+      await Future.wait(futures);
+
+      print(
+          '✅ Imagens carregadas - userImageUrl: $userImageUrl, currentUserImageUrl: $currentUserImageUrl');
+
+      // Forçar rebuild para garantir que as imagens apareçam
+      if (mounted) {
+        setState(() {});
+
+        // Aguardar um frame e forçar outro setState
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {});
+          }
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar imagens de perfil: $e');
+    }
+  }
+
+  Future<void> _loadCurrentUserImage() async {
+    try {
+      // Verificar se é ONG primeiro
       DocumentSnapshot currentUserDoc = await FirebaseFirestore.instance
           .collection('ongs')
           .doc(currentUserId)
@@ -75,9 +124,11 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
         // Usuário atual é ONG
         Map<String, dynamic> currentUserData =
             currentUserDoc.data() as Map<String, dynamic>;
-        setState(() {
-          currentUserImageUrl = currentUserData['imagemUrl'];
-        });
+        if (mounted) {
+          setState(() {
+            currentUserImageUrl = currentUserData['imagemUrl'];
+          });
+        }
       } else {
         // Usuário atual é usuário comum
         currentUserDoc = await FirebaseFirestore.instance
@@ -88,13 +139,20 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
         if (currentUserDoc.exists) {
           Map<String, dynamic> currentUserData =
               currentUserDoc.data() as Map<String, dynamic>;
-          setState(() {
-            currentUserImageUrl = currentUserData['imagemUrl'];
-          });
+          if (mounted) {
+            setState(() {
+              currentUserImageUrl = currentUserData['imagemUrl'];
+            });
+          }
         }
       }
+    } catch (e) {
+      print('Erro ao carregar imagem do usuário atual: $e');
+    }
+  }
 
-      // Carregar imagem do outro usuário
+  Future<void> _loadOtherUserImage() async {
+    try {
       String collection = userType == 'ong' ? 'ongs' : 'users';
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection(collection)
@@ -103,12 +161,14 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
 
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-        setState(() {
-          userImageUrl = userData['imagemUrl'];
-        });
+        if (mounted) {
+          setState(() {
+            userImageUrl = userData['imagemUrl'];
+          });
+        }
       }
     } catch (e) {
-      print('Erro ao carregar imagens de perfil: $e');
+      print('Erro ao carregar imagem do outro usuário: $e');
     }
   }
 

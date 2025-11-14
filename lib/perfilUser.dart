@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
+import 'components/bottom_nav_bar.dart';
+import 'image_service.dart';
 import 'dart:typed_data';
 import 'dart:io';
 import 'dart:async';
@@ -33,6 +34,7 @@ class PerfilUsuario extends StatefulWidget {
 
 class _PerfilUsuarioState extends State<PerfilUsuario> {
   Map<String, dynamic>? dadosUsuario;
+  String? userImageUrl;
   bool isLoading = true;
 
   @override
@@ -49,12 +51,16 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
             await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
         if (doc.exists) {
+          Map<String, dynamic> dados = doc.data() as Map<String, dynamic>;
+          print('📸 Dados do usuário carregados: ${dados['imagemUrl']}');
           setState(() {
-            dadosUsuario = doc.data() as Map<String, dynamic>;
+            dadosUsuario = dados;
+            userImageUrl = dados['imagemUrl'];
             isLoading = false;
           });
         } else {
           setState(() {
+            userImageUrl = null;
             isLoading = false;
           });
         }
@@ -79,6 +85,7 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 2, // Índice 2 para a aba de perfil
         isOng: false,
+        profileImageUrl: userImageUrl,
       ),
       body: Stack(
         children: [
@@ -146,37 +153,10 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
                                       dadosUsuario!['imagemUrl']
                                           .toString()
                                           .isNotEmpty)
-                                  ? Image.network(
-                                      dadosUsuario!['imagemUrl'],
-                                      fit: BoxFit.cover,
-                                      loadingBuilder:
-                                          (context, child, loadingProgress) {
-                                        if (loadingProgress == null)
-                                          return child;
-                                        return Center(
-                                          child: CircularProgressIndicator(
-                                            color: const Color.fromARGB(
-                                                255, 1, 37, 54),
-                                            strokeWidth: 2,
-                                            value: loadingProgress
-                                                        .expectedTotalBytes !=
-                                                    null
-                                                ? loadingProgress
-                                                        .cumulativeBytesLoaded /
-                                                    loadingProgress
-                                                        .expectedTotalBytes!
-                                                : null,
-                                          ),
-                                        );
-                                      },
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return const Icon(
-                                          Icons.person,
-                                          size: 50,
-                                          color: Color.fromARGB(255, 1, 37, 54),
-                                        );
-                                      },
+                                  ? SmartImage(
+                                      imageUrl: dadosUsuario!['imagemUrl'],
+                                      width: 120,
+                                      height: 120,
                                     )
                                   : const Icon(
                                       Icons.person,
