@@ -1,3 +1,4 @@
+//pg alterada
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -20,6 +21,11 @@ class _PostScreenState extends State<PostScreen> {
   bool isLoading = false;
   bool isUploadingImage = false;
 
+  // Dados da ONG
+  String? nomeOng;
+  List<String> areasAtuacao = [];
+  bool isLoadingOngData = true;
+
   // Serviços Firebase
   final FirebaseStorage _storage = FirebaseStorage.instanceFor(
       bucket: 'gs://portal-ongs.firebasestorage.app' // Mesmo bucket da ONG
@@ -30,10 +36,40 @@ class _PostScreenState extends State<PostScreen> {
   StreamSubscription<TaskSnapshot>? _uploadSubscription;
 
   @override
+  void initState() {
+    super.initState();
+    _carregarDadosOngInicial();
+  }
+
+  @override
   void dispose() {
     _cancelCurrentUpload();
     _textController.dispose();
     super.dispose();
+  }
+
+  Future<void> _carregarDadosOngInicial() async {
+    try {
+      Map<String, dynamic>? dadosOng = await _obterDadosOng();
+      if (dadosOng != null && mounted) {
+        setState(() {
+          nomeOng = dadosOng['nome'] ?? 'Minha ONG';
+          areasAtuacao = List<String>.from(dadosOng['areasAtuacao'] ?? []);
+          isLoadingOngData = false;
+        });
+      } else {
+        setState(() {
+          isLoadingOngData = false;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar dados iniciais da ONG: $e');
+      if (mounted) {
+        setState(() {
+          isLoadingOngData = false;
+        });
+      }
+    }
   }
 
   void _cancelCurrentUpload() {
@@ -384,7 +420,145 @@ class _PostScreenState extends State<PostScreen> {
                             color: Color.fromARGB(255, 1, 37, 54),
                           ),
                         ),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 20),
+
+                        // Informações da ONG que está postando
+                        if (!isLoadingOngData) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color.fromARGB(255, 1, 37, 54)
+                                  .withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color.fromARGB(255, 1, 37, 54)
+                                    .withOpacity(0.2),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color.fromARGB(
+                                            255, 1, 37, 54),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.business,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Postando como',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          Text(
+                                            nomeOng ?? 'Minha ONG',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color.fromARGB(
+                                                  255, 1, 37, 54),
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (areasAtuacao.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  const Divider(height: 1),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.category_outlined,
+                                        size: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: areasAtuacao.map((area) {
+                                            return Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 5,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color.fromARGB(
+                                                    255, 1, 37, 54),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                area,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
+                        if (isLoadingOngData)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: const Color.fromARGB(255, 1, 37, 54),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Carregando informações...',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
                         // Widget de imagem com loading
                         AnimatedSwitcher(

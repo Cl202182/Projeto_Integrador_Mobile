@@ -1,3 +1,4 @@
+//pg alterada
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -679,14 +680,17 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                       : 0;
 
                   return Container(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceEvenly,
                       children: [
                         // Estatística de likes
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
@@ -697,9 +701,9 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.favorite, color: Colors.red, size: 16),
-                              SizedBox(width: 6),
+                              SizedBox(width: 4),
                               Text(
-                                '$likes curtidas',
+                                '$likes',
                                 style: TextStyle(
                                   color: Colors.red,
                                   fontWeight: FontWeight.w600,
@@ -717,7 +721,7 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.blue.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
@@ -729,16 +733,16 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                               children: [
                                 Icon(Icons.comment,
                                     color: Colors.blue, size: 16),
-                                SizedBox(width: 6),
+                                SizedBox(width: 4),
                                 Text(
-                                  '$comentarios comentários',
+                                  '$comentarios',
                                   style: TextStyle(
                                     color: Colors.blue,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 12,
                                   ),
                                 ),
-                                SizedBox(width: 4),
+                                SizedBox(width: 2),
                                 Icon(Icons.touch_app,
                                     color: Colors.blue, size: 12),
                               ],
@@ -749,7 +753,7 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                         // Status visual
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: isAtivo
                                 ? Colors.green.withOpacity(0.1)
@@ -771,7 +775,7 @@ class _MinhasPostagensOngState extends State<MinhasPostagensOng> {
                                 color: isAtivo ? Colors.green : Colors.orange,
                                 size: 16,
                               ),
-                              SizedBox(width: 6),
+                              SizedBox(width: 4),
                               Text(
                                 isAtivo ? 'Visível' : 'Oculto',
                                 style: TextStyle(

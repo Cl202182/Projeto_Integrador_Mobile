@@ -1,9 +1,15 @@
+//pg alterada
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'image_service.dart';
+import 'homeUser.dart'; // Para PerfilOngVisualizacaoUser
+import 'perfil_user_visualizacao.dart'; // Para PerfilUserVisualizacao
+import 'perfil_user_visualizacao_ong.dart'; // Para PerfilUserVisualizacaoOng
 
 class TelaChat extends StatefulWidget {
   const TelaChat({super.key});
@@ -23,6 +29,10 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
   late String userType; // 'user' ou 'ong'
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+
+  // Imagens de perfil
+  String? userImageUrl;
+  String? currentUserImageUrl;
 
   @override
   void initState() {
@@ -48,6 +58,58 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
         args['userType'] ?? 'ong'; // Default para ONG se não especificado
     _messagesRef =
         FirebaseDatabase.instance.ref().child('chats/$chatId/messages');
+
+    // Carregar imagens de perfil
+    _loadProfileImages();
+  }
+
+  Future<void> _loadProfileImages() async {
+    try {
+      // Carregar imagem do usuário atual - verificar se é ONG ou usuário
+      DocumentSnapshot currentUserDoc = await FirebaseFirestore.instance
+          .collection('ongs')
+          .doc(currentUserId)
+          .get();
+
+      if (currentUserDoc.exists) {
+        // Usuário atual é ONG
+        Map<String, dynamic> currentUserData =
+            currentUserDoc.data() as Map<String, dynamic>;
+        setState(() {
+          currentUserImageUrl = currentUserData['imagemUrl'];
+        });
+      } else {
+        // Usuário atual é usuário comum
+        currentUserDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUserId)
+            .get();
+
+        if (currentUserDoc.exists) {
+          Map<String, dynamic> currentUserData =
+              currentUserDoc.data() as Map<String, dynamic>;
+          setState(() {
+            currentUserImageUrl = currentUserData['imagemUrl'];
+          });
+        }
+      }
+
+      // Carregar imagem do outro usuário
+      String collection = userType == 'ong' ? 'ongs' : 'users';
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection(collection)
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        setState(() {
+          userImageUrl = userData['imagemUrl'];
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar imagens de perfil: $e');
+    }
   }
 
   @override
@@ -55,6 +117,14 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
     _fadeController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // Função para proxy de imagens
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   void _sendMessage() {
@@ -93,27 +163,49 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
           await FirebaseFirestore.instance.collection('ongs').doc(userId).get();
 
       if (ongDoc.exists) {
-        // É uma ONG
+        // É uma ONG - usar PerfilOngVisualizacaoUser que tem postagens
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => PerfilVisualizacao(
+            builder: (context) => PerfilOngVisualizacaoUser(
               ongId: userId,
-              ongName: userName,
+              ongNome: userName,
             ),
           ),
         );
       } else {
-        // Não é ONG, então é usuário
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PerfilUsuarioVisualizacao(
-              userId: userId,
-              userName: userName,
-            ),
-          ),
-        );
+        // Não é ONG, então é usuário - verificar se quem está vendo é ONG ou usuário
+        String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+        if (currentUserId != null) {
+          DocumentSnapshot currentUserDoc = await FirebaseFirestore.instance
+              .collection('ongs')
+              .doc(currentUserId)
+              .get();
+
+          if (currentUserDoc.exists) {
+            // Usuário atual é ONG, usar tela específica para ONGs
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PerfilUserVisualizacaoOng(
+                  userId: userId,
+                  userName: userName,
+                ),
+              ),
+            );
+          } else {
+            // Usuário atual é usuário comum
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PerfilUserVisualizacao(
+                  userId: userId,
+                  userName: userName,
+                ),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -131,15 +223,57 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: const Color.fromARGB(255, 1, 37, 54),
-              child: Text(
-                userName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color.fromARGB(255, 1, 37, 54),
+              ),
+              child: ClipOval(
+                child: SmartImage(
+                  imageUrl: userImageUrl != null && userImageUrl!.isNotEmpty
+                      ? _getProxiedImageUrl(userImageUrl!)
+                      : '',
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  placeholder: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 1, 37, 54),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  errorWidget: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 1, 37, 54),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -208,13 +342,53 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
           ),
           if (isMe) ...[
             const SizedBox(width: 8),
-            const CircleAvatar(
-              radius: 16,
-              backgroundColor: Color.fromARGB(255, 1, 37, 54),
-              child: Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 16,
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color.fromARGB(255, 1, 37, 54),
+              ),
+              child: ClipOval(
+                child: SmartImage(
+                  imageUrl: currentUserImageUrl != null &&
+                          currentUserImageUrl!.isNotEmpty
+                      ? _getProxiedImageUrl(currentUserImageUrl!)
+                      : '',
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  placeholder: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 1, 37, 54),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  errorWidget: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 1, 37, 54),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -235,15 +409,57 @@ class _TelaChatState extends State<TelaChat> with TickerProviderStateMixin {
           onTap: _openProfile,
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: Text(
-                  userName[0].toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.2),
+                ),
+                child: ClipOval(
+                  child: SmartImage(
+                    imageUrl: userImageUrl != null && userImageUrl!.isNotEmpty
+                        ? _getProxiedImageUrl(userImageUrl!)
+                        : '',
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    errorWidget: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

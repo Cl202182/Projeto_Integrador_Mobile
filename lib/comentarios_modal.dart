@@ -1,7 +1,10 @@
+//pg alterada
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'image_service.dart';
+import 'homeUser.dart'; // Para PerfilOngVisualizacaoUser
+import 'perfil_user_visualizacao.dart'; // Para PerfilUserVisualizacao
 
 // Modal para comentários das ONGs
 class ComentariosModal extends StatefulWidget {
@@ -107,148 +110,232 @@ class _ComentariosModalState extends State<ComentariosModal> {
     }
   }
 
+  // Função para navegar para o perfil
+  void _verPerfil(String autorId, String autorNome, String autorTipo) {
+    if (autorId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Perfil não disponível'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Verificar se não é o próprio usuário
+    String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == autorId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Você não pode visualizar seu próprio perfil'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(context); // Fecha o modal primeiro
+
+    if (autorTipo == 'user') {
+      // Para usuários, navegar para perfil público
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PerfilUserVisualizacao(
+            userId: autorId,
+            userName: autorNome,
+          ),
+        ),
+      );
+    } else if (autorTipo == 'ong') {
+      // Para ONGs, navegar para perfil da ONG
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PerfilOngVisualizacaoUser(
+            ongId: autorId,
+            ongNome: autorNome,
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildComentario(DocumentSnapshot comentario) {
     Map<String, dynamic> data = comentario.data() as Map<String, dynamic>;
     bool isUser = data['autorTipo'] == 'user';
     bool isOng = data['autorTipo'] == 'ong';
+    String autorId = data['autorId'] ?? '';
+    String autorNome = data['autorNome'] ?? (isUser ? 'Usuário' : 'ONG');
+    String autorTipo = data['autorTipo'] ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Avatar do comentarista
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isUser
-                      ? Colors.blue.withOpacity(0.2)
-                      : const Color.fromARGB(255, 1, 37, 54).withOpacity(0.2),
-                ),
-                child: data['autorImagemUrl'] != null &&
-                        data['autorImagemUrl'].toString().isNotEmpty
-                    ? SmartImage(
-                        imageUrl: data['autorImagemUrl'],
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(16),
-                        placeholder: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: () {
+        if (autorId.isNotEmpty && autorTipo.isNotEmpty) {
+          _verPerfil(autorId, autorNome, autorTipo);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Avatar do comentarista - CLICÁVEL
+                GestureDetector(
+                  onTap: () {
+                    if (autorId.isNotEmpty && autorTipo.isNotEmpty) {
+                      _verPerfil(autorId, autorNome, autorTipo);
+                    }
+                  },
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isUser
+                          ? Colors.blue.withOpacity(0.2)
+                          : const Color.fromARGB(255, 1, 37, 54)
+                              .withOpacity(0.2),
+                    ),
+                    child: data['autorImagemUrl'] != null &&
+                            data['autorImagemUrl'].toString().isNotEmpty
+                        ? SmartImage(
+                            imageUrl: data['autorImagemUrl'],
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.circular(16),
+                            placeholder: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: isUser
+                                        ? Colors.blue
+                                        : const Color.fromARGB(255, 1, 37, 54),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            errorWidget: Icon(
+                              isUser ? Icons.person : Icons.business,
+                              size: 16,
+                              color: isUser
+                                  ? Colors.blue
+                                  : const Color.fromARGB(255, 1, 37, 54),
+                            ),
+                          )
+                        : Icon(
+                            isUser ? Icons.person : Icons.business,
+                            size: 16,
+                            color: isUser
+                                ? Colors.blue
+                                : const Color.fromARGB(255, 1, 37, 54),
                           ),
-                          child: Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          // Nome do comentarista - CLICÁVEL
+                          GestureDetector(
+                            onTap: () {
+                              if (autorId.isNotEmpty && autorTipo.isNotEmpty) {
+                                _verPerfil(autorId, autorNome, autorTipo);
+                              }
+                            },
+                            child: Text(
+                              autorNome,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                                 color: isUser
                                     ? Colors.blue
                                     : const Color.fromARGB(255, 1, 37, 54),
                               ),
                             ),
                           ),
-                        ),
-                        errorWidget: Icon(
-                          isUser ? Icons.person : Icons.business,
-                          size: 16,
-                          color: isUser
-                              ? Colors.blue
-                              : const Color.fromARGB(255, 1, 37, 54),
-                        ),
-                      )
-                    : Icon(
-                        isUser ? Icons.person : Icons.business,
-                        size: 16,
-                        color: isUser
-                            ? Colors.blue
-                            : const Color.fromARGB(255, 1, 37, 54),
-                      ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          data['autorNome'] ?? (isUser ? 'Usuário' : 'ONG'),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: isUser
-                                ? Colors.blue
-                                : const Color.fromARGB(255, 1, 37, 54),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isUser
-                                ? Colors.blue.withOpacity(0.1)
-                                : const Color.fromARGB(255, 1, 37, 54)
-                                    .withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            isUser ? 'USUÁRIO' : 'ONG',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
                               color: isUser
-                                  ? Colors.blue
-                                  : const Color.fromARGB(255, 1, 37, 54),
+                                  ? Colors.blue.withOpacity(0.1)
+                                  : const Color.fromARGB(255, 1, 37, 54)
+                                      .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              isUser ? 'USUÁRIO' : 'ONG',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isUser
+                                    ? Colors.blue
+                                    : const Color.fromARGB(255, 1, 37, 54),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      _formatarTempoComentario(data['created_at']),
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
+                          // Indicador visual para todos os comentários (clicáveis)
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 10,
+                            color: Colors.grey[400],
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      Text(
+                        _formatarTempoComentario(data['created_at']),
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            data['texto'] ?? '',
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.3,
-              color: Color(0xFF2D3748),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              data['texto'] ?? '',
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.3,
+                color: Color(0xFF2D3748),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -305,6 +392,33 @@ class _ComentariosModalState extends State<ComentariosModal> {
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
                   color: Colors.grey[600],
+                ),
+              ],
+            ),
+          ),
+
+          // Dica para usuários
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.touch_app, size: 16, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Toque em um comentário para ver o perfil',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),

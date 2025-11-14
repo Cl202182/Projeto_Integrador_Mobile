@@ -1,8 +1,11 @@
+//pg alterada
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
+import 'package:flutter/foundation.dart';
+import 'components/bottom_nav_bar.dart';
+import 'image_service.dart';
 
 class Contato extends StatefulWidget {
   const Contato({super.key});
@@ -22,6 +25,14 @@ class _ContatoState extends State<Contato> {
     super.initState();
     _chatsRef = FirebaseDatabase.instance.ref().child('chats');
     _loadCurrentUserData();
+  }
+
+  // Função para proxy de imagens
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   Future<void> _loadCurrentUserData() async {
@@ -407,6 +418,7 @@ class _ContatoState extends State<Contato> {
                                     'chatId': chatId,
                                     'userName': ongName,
                                     'userId': ongId,
+                                    'userType': 'ong',
                                     'currentUserId': currentUserId,
                                     'currentUserName': currentUserName,
                                   },
@@ -416,7 +428,7 @@ class _ContatoState extends State<Contato> {
                                 padding: const EdgeInsets.all(16),
                                 child: Row(
                                   children: [
-                                    // Avatar
+                                    // Avatar com imagem de perfil
                                     Container(
                                       width: 50,
                                       height: 50,
@@ -425,18 +437,83 @@ class _ContatoState extends State<Contato> {
                                             255, 1, 37, 54),
                                         borderRadius: BorderRadius.circular(25),
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          ongName.isNotEmpty
-                                              ? ongName[0].toUpperCase()
-                                              : 'O',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
+                                      child: ongData['imagemUrl'] != null &&
+                                              ongData['imagemUrl']
+                                                  .toString()
+                                                  .isNotEmpty
+                                          ? ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(25),
+                                              child: SmartImage(
+                                                imageUrl: _getProxiedImageUrl(
+                                                    ongData['imagemUrl']),
+                                                width: 50,
+                                                height: 50,
+                                                fit: BoxFit.cover,
+                                                placeholder: Container(
+                                                  width: 50,
+                                                  height: 50,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color.fromARGB(
+                                                        255, 1, 37, 54),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            25),
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      ongName.isNotEmpty
+                                                          ? ongName[0]
+                                                              .toUpperCase()
+                                                          : 'O',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                errorWidget: Container(
+                                                  width: 50,
+                                                  height: 50,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color.fromARGB(
+                                                        255, 1, 37, 54),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            25),
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      ongName.isNotEmpty
+                                                          ? ongName[0]
+                                                              .toUpperCase()
+                                                          : 'O',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                ongName.isNotEmpty
+                                                    ? ongName[0].toUpperCase()
+                                                    : 'O',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
                                     ),
 
                                     const SizedBox(width: 16),
@@ -602,6 +679,14 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
     'Idosos',
     'Crianças e Adolescentes',
   ];
+
+  // Função para proxy de imagens
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
+  }
 
   void _toggleFilter(String filter) {
     setState(() {
@@ -966,6 +1051,7 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
                                       'chatId': chatId,
                                       'userName': ongName,
                                       'userId': ongId,
+                                      'userType': 'ong',
                                       'currentUserId': widget.currentUserId,
                                       'currentUserName': widget.currentUserName,
                                     },
@@ -986,18 +1072,99 @@ class _SearchOngsPageState extends State<SearchOngsPage> {
                                               borderRadius:
                                                   BorderRadius.circular(25),
                                             ),
-                                            child: Center(
-                                              child: Text(
-                                                ongName.isNotEmpty
-                                                    ? ongName[0].toUpperCase()
-                                                    : 'O',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
+                                            child: ongData['imagemUrl'] !=
+                                                        null &&
+                                                    ongData['imagemUrl']
+                                                        .toString()
+                                                        .isNotEmpty
+                                                ? ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            25),
+                                                    child: SmartImage(
+                                                      imageUrl:
+                                                          _getProxiedImageUrl(
+                                                              ongData[
+                                                                  'imagemUrl']),
+                                                      width: 50,
+                                                      height: 50,
+                                                      fit: BoxFit.cover,
+                                                      placeholder: Container(
+                                                        width: 50,
+                                                        height: 50,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: const Color
+                                                              .fromARGB(
+                                                              255, 1, 37, 54),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(25),
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            ongName.isNotEmpty
+                                                                ? ongName[0]
+                                                                    .toUpperCase()
+                                                                : 'O',
+                                                            style:
+                                                                const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 18,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      errorWidget: Container(
+                                                        width: 50,
+                                                        height: 50,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: const Color
+                                                              .fromARGB(
+                                                              255, 1, 37, 54),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(25),
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            ongName.isNotEmpty
+                                                                ? ongName[0]
+                                                                    .toUpperCase()
+                                                                : 'O',
+                                                            style:
+                                                                const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 18,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  )
+                                                : Center(
+                                                    child: Text(
+                                                      ongName.isNotEmpty
+                                                          ? ongName[0]
+                                                              .toUpperCase()
+                                                          : 'O',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
                                           ),
                                           const SizedBox(width: 16),
                                           Expanded(

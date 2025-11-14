@@ -1,8 +1,13 @@
+//pg alterada
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
+import 'minhaspostagens.dart';
 
 class VisualizarPerfilOng extends StatefulWidget {
   const VisualizarPerfilOng({super.key});
@@ -417,6 +422,45 @@ class _VisualizarPerfilOngState extends State<VisualizarPerfilOng> {
                                         ),
                                       ),
                               ],
+                            ),
+                          ),
+
+                          // Botão Ver Minhas Postagens
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 20),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    const Color.fromARGB(255, 1, 37, 54),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/hong').then((_) {
+                                  // Navegar para aba de minhas postagens
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          MinhasPostagensOng(),
+                                    ),
+                                  );
+                                });
+                              },
+                              icon: const Icon(Icons.my_library_books,
+                                  color: Colors.white),
+                              label: const Text(
+                                "Ver Minhas Postagens",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
 

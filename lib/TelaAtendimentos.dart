@@ -1,8 +1,11 @@
+//pg alterada
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
+import 'package:flutter/foundation.dart';
+import 'components/bottom_nav_bar.dart';
+import 'image_service.dart';
 
 class Atendimento extends StatefulWidget {
   const Atendimento({super.key});
@@ -22,6 +25,14 @@ class _AtendimentoState extends State<Atendimento> {
     super.initState();
     _chatsRef = FirebaseDatabase.instance.ref().child('chats');
     _loadCurrentOngData();
+  }
+
+  // Função para proxy de imagens
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   Future<void> _loadCurrentOngData() async {
@@ -340,6 +351,7 @@ class _AtendimentoState extends State<Atendimento> {
                                     'chatId': chatId,
                                     'userName': userName,
                                     'userId': userId,
+                                    'userType': 'user',
                                     'currentUserId': currentOngId,
                                     'currentUserName': currentOngName,
                                   },
@@ -360,7 +372,7 @@ class _AtendimentoState extends State<Atendimento> {
                                     ),
                                     const SizedBox(width: 12),
 
-                                    // Avatar
+                                    // Avatar com imagem de perfil
                                     Container(
                                       width: 50,
                                       height: 50,
@@ -368,18 +380,81 @@ class _AtendimentoState extends State<Atendimento> {
                                         color: Colors.blue[600],
                                         borderRadius: BorderRadius.circular(25),
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          userName.isNotEmpty
-                                              ? userName[0].toUpperCase()
-                                              : 'U',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
+                                      child: userData['imagemUrl'] != null &&
+                                              userData['imagemUrl']
+                                                  .toString()
+                                                  .isNotEmpty
+                                          ? ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(25),
+                                              child: SmartImage(
+                                                imageUrl: _getProxiedImageUrl(
+                                                    userData['imagemUrl']),
+                                                width: 50,
+                                                height: 50,
+                                                fit: BoxFit.cover,
+                                                placeholder: Container(
+                                                  width: 50,
+                                                  height: 50,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.blue[600],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            25),
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      userName.isNotEmpty
+                                                          ? userName[0]
+                                                              .toUpperCase()
+                                                          : 'U',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                errorWidget: Container(
+                                                  width: 50,
+                                                  height: 50,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.blue[600],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            25),
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      userName.isNotEmpty
+                                                          ? userName[0]
+                                                              .toUpperCase()
+                                                          : 'U',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                userName.isNotEmpty
+                                                    ? userName[0].toUpperCase()
+                                                    : 'U',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
                                     ),
 
                                     const SizedBox(width: 16),

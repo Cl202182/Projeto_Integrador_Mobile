@@ -1,12 +1,15 @@
+//pg alterada
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_projeto_integrador/components/bottom_nav_bar.dart';
 import 'dart:async';
 
 import 'package:flutter_application_projeto_integrador/telaChat.dart';
+import 'components/bottom_nav_bar.dart';
+import 'perfil_user_visualizacao.dart';
+import 'image_service.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -17,11 +20,31 @@ class HomeUser extends StatefulWidget {
 
 class _HomeUserState extends State<HomeUser> {
   String? nomeUsuario;
+  String? userImageUrl;
   bool isLoading = true;
   StreamSubscription<QuerySnapshot>? _postsSubscription;
   List<DocumentSnapshot> _posts = [];
+  List<DocumentSnapshot> _allPosts = []; // Lista completa sem filtro
   bool _isLoadingPosts = true;
   String? _errorMessage;
+
+  // Filtro de áreas
+  List<String> _selectedFilters = [];
+  bool _showFilters = false;
+
+  // Áreas disponíveis
+  final List<String> areasDisponiveis = [
+    'Educação',
+    'Saúde',
+    'Meio Ambiente',
+    'Assistência Social',
+    'Cultura',
+    'Esporte',
+    'Direitos Humanos',
+    'Animais',
+    'Idosos',
+    'Crianças e Adolescentes',
+  ];
 
   @override
   void initState() {
@@ -36,6 +59,39 @@ class _HomeUserState extends State<HomeUser> {
     super.dispose();
   }
 
+  // Funções de filtro
+  void _toggleFilter(String filter) {
+    setState(() {
+      if (_selectedFilters.contains(filter)) {
+        _selectedFilters.remove(filter);
+      } else {
+        _selectedFilters.add(filter);
+      }
+      _aplicarFiltros();
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedFilters.clear();
+      _aplicarFiltros();
+    });
+  }
+
+  void _aplicarFiltros() {
+    if (_selectedFilters.isEmpty) {
+      _posts = List.from(_allPosts);
+    } else {
+      _posts = _allPosts.where((post) {
+        Map<String, dynamic> data = post.data() as Map<String, dynamic>;
+        List<dynamic> areasPost = data['areasAtuacao'] ?? [];
+
+        // Verifica se o post tem pelo menos uma área selecionada
+        return _selectedFilters.any((filter) => areasPost.contains(filter));
+      }).toList();
+    }
+  }
+
   Future<void> _carregarNomeUsuario() async {
     try {
       String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -47,11 +103,13 @@ class _HomeUserState extends State<HomeUser> {
           Map<String, dynamic> dados = doc.data() as Map<String, dynamic>;
           setState(() {
             nomeUsuario = dados['nome'] ?? 'Usuário';
+            userImageUrl = dados['imagemUrl'];
             isLoading = false;
           });
         } else {
           setState(() {
             nomeUsuario = 'Usuário';
+            userImageUrl = null;
             isLoading = false;
           });
         }
@@ -142,12 +200,14 @@ class _HomeUserState extends State<HomeUser> {
           }).toList();
 
           setState(() {
-            _posts = postsAtivos;
+            _allPosts = postsAtivos;
+            _aplicarFiltros(); // Aplica filtros se houver
             _isLoadingPosts = false;
             _errorMessage = null;
           });
 
-          print('Posts carregados: ${_posts.length}');
+          print(
+              'Posts carregados: ${_allPosts.length}, Após filtro: ${_posts.length}');
         },
         onError: (error) {
           print('Erro detalhado no stream: $error');
@@ -194,6 +254,34 @@ class _HomeUserState extends State<HomeUser> {
         ),
       ),
     );
+  }
+
+  // Função para navegar para perfil a partir dos comentários
+  void _verPerfilFromComment(
+      String autorId, String autorNome, String autorTipo) {
+    if (autorTipo == 'user') {
+      // Para usuários, navegar para perfil público
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PerfilUserVisualizacao(
+            userId: autorId,
+            userName: autorNome,
+          ),
+        ),
+      );
+    } else if (autorTipo == 'ong') {
+      // Para ONGs, navegar para perfil da ONG
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PerfilOngVisualizacaoUser(
+            ongId: autorId,
+            ongNome: autorNome,
+          ),
+        ),
+      );
+    }
   }
 
   String _getPrimeiroNome() {
@@ -914,71 +1002,211 @@ class _HomeUserState extends State<HomeUser> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: GestureDetector(
-          onTap: _visualizarPerfil,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 20,
-                ),
+        title: Row(
+          children: [
+            // Logo/Ícone do Portal
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      isLoading ? 'Carregando...' : 'Olá',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    Text(
-                      isLoading ? '' : _getPrimeiroNome(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+              child: const Icon(
+                Icons.hub_rounded,
+                color: Colors.white,
+                size: 24,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+
+            // Texto PORTAL
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'PORTAL',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 2,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Colors.white, Colors.transparent],
+                    ),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         backgroundColor: const Color.fromARGB(255, 1, 37, 54),
         elevation: 2,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.grey[50]!,
-              Colors.grey[100]!,
-            ],
+        actions: [
+          // Botão de filtro
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.filter_list, color: Colors.white),
+                if (_selectedFilters.isNotEmpty)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 14,
+                        minHeight: 14,
+                      ),
+                      child: Text(
+                        '${_selectedFilters.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: () {
+              setState(() {
+                _showFilters = !_showFilters;
+              });
+            },
           ),
-        ),
-        child: _buildFeedContent(),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Painel de filtros
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: _showFilters ? 120 : 0,
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filtrar por área de interesse:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (_selectedFilters.isNotEmpty)
+                          TextButton(
+                            onPressed: _clearFilters,
+                            child: const Text(
+                              'Limpar',
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 1, 37, 54),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: areasDisponiveis.map((area) {
+                          bool isSelected = _selectedFilters.contains(area);
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(
+                                area,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color.fromARGB(255, 1, 37, 54),
+                                ),
+                              ),
+                              selected: isSelected,
+                              onSelected: (selected) => _toggleFilter(area),
+                              backgroundColor: Colors.grey[200],
+                              selectedColor:
+                                  const Color.fromARGB(255, 1, 37, 54),
+                              checkmarkColor: Colors.white,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Feed de postagens
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.grey[50]!,
+                    Colors.grey[100]!,
+                  ],
+                ),
+              ),
+              child: _buildFeedContent(),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 0,
         isOng: false,
+        profileImageUrl: userImageUrl,
       ),
     );
   }
@@ -1007,6 +1235,54 @@ class _ComentariosModalState extends State<ComentariosModal> {
   void dispose() {
     _comentarioController.dispose();
     super.dispose();
+  }
+
+  // Função para navegar para perfil a partir dos comentários
+  void _verPerfilFromComment(
+      String autorId, String autorNome, String autorTipo) {
+    // Verificar se não é o próprio usuário
+    String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == autorId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Você não pode visualizar seu próprio perfil'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (autorTipo == 'user') {
+      // Para usuários, navegar para perfil público
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PerfilUserVisualizacao(
+            userId: autorId,
+            userName: autorNome,
+          ),
+        ),
+      );
+    } else if (autorTipo == 'ong') {
+      // Para ONGs, navegar para perfil da ONG
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PerfilOngVisualizacaoUser(
+            ongId: autorId,
+            ongNome: autorNome,
+          ),
+        ),
+      );
+    }
+  }
+
+  // Função para proxy de imagens
+  String _getProxiedImageUrl(String originalUrl) {
+    if (kIsWeb) {
+      return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   Future<void> _enviarComentario() async {
@@ -1088,6 +1364,9 @@ class _ComentariosModalState extends State<ComentariosModal> {
   Widget _buildComentario(DocumentSnapshot comentario) {
     Map<String, dynamic> data = comentario.data() as Map<String, dynamic>;
     bool isUser = data['autorTipo'] == 'user';
+    String autorId = data['autorId'] ?? '';
+    String autorNome = data['autorNome'] ?? (isUser ? 'Usuário' : 'ONG');
+    String autorTipo = data['autorTipo'] ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1102,17 +1381,63 @@ class _ComentariosModalState extends State<ComentariosModal> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: isUser
-                    ? Colors.blue.withOpacity(0.2)
-                    : const Color.fromARGB(255, 1, 37, 54).withOpacity(0.2),
-                child: Icon(
-                  isUser ? Icons.person : Icons.business,
-                  size: 16,
-                  color: isUser
-                      ? Colors.blue
-                      : const Color.fromARGB(255, 1, 37, 54),
+              // Avatar com imagem de perfil - CLICÁVEL
+              GestureDetector(
+                onTap: () {
+                  if (autorId.isNotEmpty && autorTipo.isNotEmpty) {
+                    _verPerfilFromComment(autorId, autorNome, autorTipo);
+                  }
+                },
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isUser
+                        ? Colors.blue.withOpacity(0.2)
+                        : const Color.fromARGB(255, 1, 37, 54).withOpacity(0.2),
+                  ),
+                  child: data['autorImagemUrl'] != null &&
+                          data['autorImagemUrl'].toString().isNotEmpty
+                      ? SmartImage(
+                          imageUrl: data['autorImagemUrl'],
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          borderRadius: BorderRadius.circular(16),
+                          placeholder: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: isUser
+                                  ? Colors.blue.withOpacity(0.2)
+                                  : const Color.fromARGB(255, 1, 37, 54)
+                                      .withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isUser ? Icons.person : Icons.business,
+                              size: 16,
+                              color: isUser
+                                  ? Colors.blue
+                                  : const Color.fromARGB(255, 1, 37, 54),
+                            ),
+                          ),
+                          errorWidget: Icon(
+                            isUser ? Icons.person : Icons.business,
+                            size: 16,
+                            color: isUser
+                                ? Colors.blue
+                                : const Color.fromARGB(255, 1, 37, 54),
+                          ),
+                        )
+                      : Icon(
+                          isUser ? Icons.person : Icons.business,
+                          size: 16,
+                          color: isUser
+                              ? Colors.blue
+                              : const Color.fromARGB(255, 1, 37, 54),
+                        ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1120,14 +1445,22 @@ class _ComentariosModalState extends State<ComentariosModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      data['autorNome'] ?? (isUser ? 'Usuário' : 'ONG'),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: isUser
-                            ? Colors.blue
-                            : const Color.fromARGB(255, 1, 37, 54),
+                    // Nome clicável
+                    GestureDetector(
+                      onTap: () {
+                        if (autorId.isNotEmpty && autorTipo.isNotEmpty) {
+                          _verPerfilFromComment(autorId, autorNome, autorTipo);
+                        }
+                      },
+                      child: Text(
+                        data['autorNome'] ?? (isUser ? 'Usuário' : 'ONG'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: isUser
+                              ? Colors.blue
+                              : const Color.fromARGB(255, 1, 37, 54),
+                        ),
                       ),
                     ),
                     Text(
@@ -1332,11 +1665,14 @@ class PerfilOngVisualizacaoUser extends StatefulWidget {
 class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
   Map<String, dynamic>? ongData;
   bool isLoading = true;
+  List<DocumentSnapshot> postagens = [];
+  bool isLoadingPosts = true;
 
   @override
   void initState() {
     super.initState();
     _carregarDadosOng();
+    _carregarPostagens();
   }
 
   Future<void> _carregarDadosOng() async {
@@ -1363,6 +1699,37 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao carregar dados: $e')),
       );
+    }
+  }
+
+  Future<void> _carregarPostagens() async {
+    try {
+      // Primeira tentativa: sem orderBy para evitar problemas de índice
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .where('ongId', isEqualTo: widget.ongId)
+          .where('ativa', isEqualTo: true)
+          .limit(10)
+          .get();
+
+      // Se não encontrou postagens, tenta sem o filtro 'ativa'
+      if (snapshot.docs.isEmpty) {
+        snapshot = await FirebaseFirestore.instance
+            .collection('posts')
+            .where('ongId', isEqualTo: widget.ongId)
+            .limit(10)
+            .get();
+      }
+
+      setState(() {
+        postagens = snapshot.docs;
+        isLoadingPosts = false;
+      });
+    } catch (e) {
+      print('Erro ao carregar postagens: $e');
+      setState(() {
+        isLoadingPosts = false;
+      });
     }
   }
 
@@ -1429,7 +1796,7 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
     }
   }
 
-  // SOLUÇÃO DEFINITIVA: PROXY PARA IMAGENS
+  // Função para proxy de imagens
   String _getProxiedImageUrl(String originalUrl) {
     if (kIsWeb) {
       return 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(originalUrl)}';
@@ -1545,6 +1912,94 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPostagem(DocumentSnapshot post) {
+    Map<String, dynamic> data = post.data() as Map<String, dynamic>;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Imagem da postagem
+          if (data['imagemUrl'] != null)
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              child: Image.network(
+                _getProxiedImageUrl(data['imagemUrl']),
+                width: double.infinity,
+                height: 200,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 200,
+                    color: Colors.grey[200],
+                    child: const Icon(Icons.image_not_supported, size: 50),
+                  );
+                },
+              ),
+            ),
+
+          // Conteúdo
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Texto
+                Text(
+                  data['texto'] ?? '',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+
+                // Estatísticas
+                Row(
+                  children: [
+                    Icon(Icons.favorite_border,
+                        size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${data['likes'] ?? 0}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.comment_outlined,
+                        size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${data['comentarios'] ?? 0}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1805,6 +2260,117 @@ class _PerfilOngVisualizacaoUserState extends State<PerfilOngVisualizacaoUser> {
 
                       // Áreas de atuação
                       _buildAreasAtuacao(),
+
+                      // Seção de Postagens
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color.fromARGB(255, 1, 37, 54)
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.article,
+                                    color: Color.fromARGB(255, 1, 37, 54),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'Postagens Públicas',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color.fromARGB(255, 1, 37, 54),
+                                    ),
+                                  ),
+                                ),
+                                if (!isLoadingPosts && postagens.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          const Color.fromARGB(255, 1, 37, 54),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${postagens.length}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Lista de postagens
+                            if (isLoadingPosts)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: CircularProgressIndicator(
+                                    color: Color.fromARGB(255, 1, 37, 54),
+                                  ),
+                                ),
+                              )
+                            else if (postagens.isEmpty)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.article_outlined,
+                                        size: 50,
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Nenhuma postagem pública ainda',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else
+                              Column(
+                                children: postagens
+                                    .map((post) => _buildPostagem(post))
+                                    .toList(),
+                              ),
+                          ],
+                        ),
+                      ),
 
                       const SizedBox(height: 20),
                     ],
